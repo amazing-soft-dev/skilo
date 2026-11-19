@@ -1,6 +1,6 @@
 ---
 name: optimize-app
-description: "Audit and optimize a web app or service codebase (Next.js/React, Node, Python, or whatever the repo uses): performance and Core Web Vitals, bundle size, dependencies, dead and duplicate code, architecture, technical SEO, accessibility, security, tests and CI. Use whenever the user asks to optimize, speed up, clean up, slim down, reduce bundle size or tech debt, refactor for maintainability, or run a code or site health audit, even if they name only one of these."
+description: Audit and optimize a web app or service codebase (Next.js/React, Node, Python, or whatever the repo uses): performance and Core Web Vitals, bundle size, dependencies, dead and duplicate code, architecture, technical SEO, accessibility, security, tests and CI. Use whenever the user asks to optimize, speed up, clean up, slim down, reduce bundle size or tech debt, refactor for maintainability, or run a code or site health audit, even if they name only one of these.
 ---
 
 # Optimize App
@@ -21,11 +21,10 @@ These exist because "optimize everything" produces large diffs with no proven be
 
 ## Read-only safety during the audit
 
-- Do not install, build or run anything that writes into the user's project folder unless they agreed. Builds, incremental type checks and test runners leave artifacts and caches behind.
+- Do not install, build or run anything that writes into the user's project folder unless they agreed. Builds, incremental type checks and test runners leave artifacts and caches behind. To run the project's own scripts anyway, export the committed tree to a temporary folder outside the repo (`git archive HEAD | tar -x -C <dir>`), install there and run everything there. Generated, git-ignored inputs are missing from that copy, so note which checks need them.
 - Git: read only. Record the branch, commit and any uncommitted changes, and leave them alone. Use `GIT_OPTIONAL_LOCKS=0` for status and log so no lock files are left behind.
 - Secrets: never print the contents of `.env` files, keys or tokens. Check only that they are ignored by git and which variable names exist (from the example file).
 - Keep throwaway analysis scripts outside the repo.
-- The one place this skill writes during an audit is its own folder in the project, `.claude/optimize-app/` (see "Project memory").
 
 ## Workflow
 
@@ -38,8 +37,6 @@ These exist because "optimize everything" produces large diffs with no proven be
 "Optimize this" with no detail means a full audit plus a proposed plan. If the repo holds several apps (for example `backend/` and `frontend/`), or the user gave several repos, audit each as its own unit with its own baseline and findings.
 
 ### 2. Detect stack, conventions and existing guardrails
-
-Start with `.claude/optimize-app/PROFILE.md`. If it exists, this project has been audited before: read it and the latest report in `.claude/optimize-app/audits/`, then verify instead of rediscovering (see "Project memory"). If it does not exist, this is a first audit.
 
 Read, as present: package manifests and lockfiles, framework config, `tsconfig.json`, `pyproject.toml` / `requirements*.txt`, Dockerfiles, CI workflows, `README`, `CONTRIBUTING`, `AGENTS.md` / `CLAUDE.md`, and the `docs/` folder. Note the rendering model (static, server-rendered, client-only), the data layer, and hosting.
 
@@ -67,7 +64,7 @@ Never leave the user thinking something ran when it did not.
 
 ### 4. Capture a baseline
 
-Collect the numbers in "Measurement" for the areas in scope. A failing build, typecheck or test suite is finding number one.
+Collect the numbers in "Measurement" for the areas in scope. A failing build, typecheck or test suite is finding number one. Before reporting a failing test, run it again alone with one worker: a test that passes alone and fails only beside others is timing-sensitive, a smaller and different finding than broken behavior.
 
 ### 5. Audit the areas in scope
 
@@ -84,7 +81,7 @@ Rate each finding on impact (which metric moves, roughly how much), effort (S: u
 
 ### 7. Report
 
-Use "Report format". Save the full report to `.claude/optimize-app/audits/YYYY-MM-DD.md`, then create or update `PROFILE.md` as described in "Project memory". In the conversation, give the summary, the findings table and what changed since the last audit, and say where the files were written.
+Use "Report format". Deliver in the conversation unless the user asks for a file.
 
 ### 8. Implement (fix mode)
 
@@ -108,7 +105,7 @@ Review the run and ask:
 
 Then:
 
-1. Sort each lesson. If it would hold in a different repo with a different stack, it is a candidate for this file. If it is about this project (paths, product names, its conventions, its false positives), it goes in the project's `PROFILE.md`, never here.
+1. Keep only lessons that would hold in a different repo with a different stack. Facts about this project (paths, product names, its conventions) belong in the project's own `CLAUDE.md` or `AGENTS.md`, never here.
 2. Propose at most five edits. Prefer correcting or replacing an existing line over appending a new one, and delete anything the run showed to be useless. Keep this file under 500 lines; if a section grows, move it to a reference file beside this one and link to it.
 3. Show the changes as a diff and wait for approval. Apply them only when the user agrees, unless they said in advance to apply without asking.
 4. After applying, add one line to `CHANGELOG.md` beside this file: date, kind of repo audited (for example "Next.js marketing site"), what changed and why.
@@ -190,6 +187,8 @@ These found the highest-value issues in practice and work without installing any
 
 **Attribute bundle weight.** From build output, list the scripts each page's HTML references, gzip each, and identify what is inside by searching for distinctive strings. Exclude scripts modern browsers never download (`nomodule` polyfills).
 
+**Weigh the HTML document too.** Gzip each built page, split the markup from the framework's inline data payload, then strip suspected repeats (long inline styles, generated SVG, data URIs) and gzip again to see what each costs. Inline data in a shared layout is paid on every page, is never cached, and is often sent twice: once as markup and once in the payload.
+
 **Audit the gates themselves.** A budget script that counts the wrong files, a threshold with no headroom or far too much, a check that passes when its target is missing: verify that existing guardrails measure what they claim.
 
 **Import graph for dead code.** Build a file-level graph from entry points and list files nothing reaches. Then discard false positives before reporting:
@@ -204,7 +203,7 @@ Report "used only by tests" as its own category: that is either a deliberately e
 
 **Hot path or cold path.** A database call inside a loop, a long function or a slow query matters in proportion to how often it runs. Find the callers first. A one-off migration that updates rows one at a time is a P3; the same pattern in a request handler is a P1.
 
-**Cross-check before reporting.** Search the whole repo (source, scripts, docs, CI) for each name you are about to call unused, and re-read each cited line.
+**Cross-check before reporting.** Search the whole repo (source, scripts, docs, CI) for each name you are about to call unused, and re-read each cited line, including lines cited by a reviewer you delegated to. Where build output exists, confirm claims about rendered pages (metadata tags, headings, links) in the built HTML, not from source alone. Before filing issues, search the tracker for an existing one, and if the repository is public, keep the steps to abuse a weakness out of the issue text.
 
 ## Areas
 
@@ -307,7 +306,7 @@ Only when asked: key events fire once, forms ask for no more than needed, consen
 | Complexity | Linter complexity rule; `ruff --select C901`, `radon` | Syntax-tree script counting lines and branches per function | Flag outliers only |
 | Vulnerabilities | `npm audit --omit=dev`, `pip-audit` | Not measurable offline; say so | No high or critical in production deps |
 | Accessibility | The project's axe tests, or `@axe-core/cli` | Manual code review, labeled as such | Zero serious violations |
-| Tests and CI | Runner timings, CI durations | Read the workflow files | Report baseline |
+| Tests and CI | Per-step durations of a recent green run from the CI provider, ranked by share of the run | Read the workflow files | Report baseline; flag a step over 10% that guards something most changes do not touch |
 | Source size | Lines of production source, excluding tests, generated files and build output | Same | Report only |
 
 Lab scores are for debugging; field data decides whether users have a good experience. Interaction responsiveness barely shows in lab runs.
@@ -322,9 +321,6 @@ Branch <name> · commit <sha> · <date> · uncommitted changes: <none | n files>
 
 ## Summary
 Three to five sentences: overall state, the biggest wins available, anything urgent.
-
-## Since the last audit
-Findings fixed, still open and new; metric movement. Omit on a first audit.
 
 ## Stack
 Framework and versions, rendering model, data layer, hosting.
