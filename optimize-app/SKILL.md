@@ -1,6 +1,6 @@
 ---
 name: optimize-app
-description: Audit and optimize a web app or service codebase (Next.js/React, Node, Python, or whatever the repo uses): performance and Core Web Vitals, bundle size, dependencies, dead and duplicate code, architecture, technical SEO, accessibility, security, tests and CI. Use whenever the user asks to optimize, speed up, clean up, slim down, reduce bundle size or tech debt, refactor for maintainability, or run a code or site health audit, even if they name only one of these.
+description: "Audit and optimize a web app or service codebase (Next.js/React, Node, Python, or whatever the repo uses): performance and Core Web Vitals, bundle size, dependencies, dead and duplicate code, architecture, technical SEO, accessibility, security, tests and CI. Use whenever the user asks to optimize, speed up, clean up, slim down, reduce bundle size or tech debt, refactor for maintainability, or run a code or site health audit, even if they name only one of these."
 ---
 
 # Optimize App
@@ -25,6 +25,7 @@ These exist because "optimize everything" produces large diffs with no proven be
 - Git: read only. Record the branch, commit and any uncommitted changes, and leave them alone. Use `GIT_OPTIONAL_LOCKS=0` for status and log so no lock files are left behind.
 - Secrets: never print the contents of `.env` files, keys or tokens. Check only that they are ignored by git and which variable names exist (from the example file).
 - Keep throwaway analysis scripts outside the repo.
+- The one place this skill writes during an audit is its own folder in the project, `.claude/optimize-app/` (see "Project memory").
 
 ## Workflow
 
@@ -37,6 +38,8 @@ These exist because "optimize everything" produces large diffs with no proven be
 "Optimize this" with no detail means a full audit plus a proposed plan. If the repo holds several apps (for example `backend/` and `frontend/`), or the user gave several repos, audit each as its own unit with its own baseline and findings.
 
 ### 2. Detect stack, conventions and existing guardrails
+
+Start with `.claude/optimize-app/PROFILE.md`. If it exists, this project has been audited before: read it and the latest report in `.claude/optimize-app/audits/`, then verify instead of rediscovering (see "Project memory"). If it does not exist, this is a first audit.
 
 Read, as present: package manifests and lockfiles, framework config, `tsconfig.json`, `pyproject.toml` / `requirements*.txt`, Dockerfiles, CI workflows, `README`, `CONTRIBUTING`, `AGENTS.md` / `CLAUDE.md`, and the `docs/` folder. Note the rendering model (static, server-rendered, client-only), the data layer, and hosting.
 
@@ -81,7 +84,7 @@ Rate each finding on impact (which metric moves, roughly how much), effort (S: u
 
 ### 7. Report
 
-Use "Report format". Deliver in the conversation unless the user asks for a file.
+Use "Report format". Save the full report to `.claude/optimize-app/audits/YYYY-MM-DD.md`, then create or update `PROFILE.md` as described in "Project memory". In the conversation, give the summary, the findings table and what changed since the last audit, and say where the files were written.
 
 ### 8. Implement (fix mode)
 
@@ -105,12 +108,79 @@ Review the run and ask:
 
 Then:
 
-1. Keep only lessons that would hold in a different repo with a different stack. Facts about this project (paths, product names, its conventions) belong in the project's own `CLAUDE.md` or `AGENTS.md`, never here.
+1. Sort each lesson. If it would hold in a different repo with a different stack, it is a candidate for this file. If it is about this project (paths, product names, its conventions, its false positives), it goes in the project's `PROFILE.md`, never here.
 2. Propose at most five edits. Prefer correcting or replacing an existing line over appending a new one, and delete anything the run showed to be useless. Keep this file under 500 lines; if a section grows, move it to a reference file beside this one and link to it.
 3. Show the changes as a diff and wait for approval. Apply them only when the user agrees, unless they said in advance to apply without asking.
 4. After applying, add one line to `CHANGELOG.md` beside this file: date, kind of repo audited (for example "Next.js marketing site"), what changed and why.
 
 If this file is not editable in the current environment, list the proposed edits at the end of the report instead.
+
+## Project memory
+
+This skill is the procedure and stays generic. What it learns about one project lives in that project, in `.claude/optimize-app/`:
+
+```
+.claude/optimize-app/
+├── PROFILE.md            # current facts about this project, updated in place
+└── audits/
+    ├── 2026-11-18.md     # one full report per audit, never edited afterwards
+    └── 2026-12-02.md
+```
+
+The profile saves rediscovery and stops the same false positives and accepted trade-offs being reported again. The dated reports give a before/after record.
+
+Do not write a project copy of this skill, and do not create numbered versions of the profile (`PROFILE-v2`, `skill1`). A second skill with the same name is either shadowed or competes to be triggered, a copy stops receiving improvements made to this file, and old versions get read as if they were current. History belongs in `audits/` and in git.
+
+### PROFILE.md
+
+Write it from what this audit verified, not from this skill's text. Nothing in it should be true of projects in general. Keep it under about 150 lines and update it in place each audit: correct what changed, delete what no longer applies.
+
+```
+# Optimization profile: <project>
+Last audit: <date> · commit <sha> · report: audits/<date>.md
+
+## Stack
+Versions, rendering model, data layer, hosting. One line each.
+
+## Commands
+The exact commands for build, typecheck, lint, tests and budget checks, and where
+they were verified to run (OS, runtime version). Note any that could not run and why.
+
+## Guardrails in place
+Budgets, gates and tests the project enforces, with file paths.
+
+## Accepted trade-offs
+Decisions the team made on purpose, each with where it is documented.
+Do not report these again unless the evidence changed.
+
+## Known false positives
+Things that look unused, slow or unsafe here but are not, with the reason.
+
+## Where to look first
+Project-specific checks that paid off, and the modules where problems cluster.
+
+## Baseline history
+| Date | Commit | <the metrics tracked for this project> |
+
+## Findings
+| ID | First seen | Finding | Status |
+Status is open, fixed in <commit>, or declined with the reason.
+```
+
+In a repo with several apps, keep one profile with a section per app, or one `PROFILE-<app>.md` each if it outgrows the limit.
+
+### Using the profile on later audits
+
+- Treat it as a cache, not as truth. Confirm that versions, commands and guardrails still match the repo, and re-verify any fact a finding depends on.
+- Keep finding IDs stable. An ID is never reused, and a finding that is still present keeps its ID and first-seen date.
+- Open each report with what changed since the last audit: findings fixed, still open and new, and metric movement against the baseline history.
+- Skip what the profile marks as accepted or as a false positive, unless something about it changed.
+
+### Rules for these files
+
+- No secrets, tokens or personal data.
+- Check whether `.claude/` is ignored by git and tell the user. Ignored means the files stay on this machine; not ignored means they show up as untracked. Do not commit them unasked. If the team should share them, suggest moving the folder under `docs/`.
+- If the folder cannot be written in this environment, deliver the profile and the report in the conversation and say where to save them.
 
 ## Techniques
 
@@ -252,6 +322,9 @@ Branch <name> · commit <sha> · <date> · uncommitted changes: <none | n files>
 
 ## Summary
 Three to five sentences: overall state, the biggest wins available, anything urgent.
+
+## Since the last audit
+Findings fixed, still open and new; metric movement. Omit on a first audit.
 
 ## Stack
 Framework and versions, rendering model, data layer, hosting.
