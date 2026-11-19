@@ -13,7 +13,7 @@ These exist because "optimize everything" produces large diffs with no proven be
 
 1. **Measure before and after.** Every finding cites evidence (a file and line, or command output) and every fix is re-measured. If something could not be measured, say so instead of estimating.
 2. **Preserve behavior.** Tests, typecheck and build pass before a change and after it. If the code being changed has no tests, say so and add a minimal one first or flag the risk.
-3. **Audit first, change second.** The audit is read-only. Edit code only when the user asked for fixes or approved the plan.
+3. **Audit first, change second.** The audit is read-only, apart from its own notes (see "Project memory"). Edit code only when the user asked for fixes or approved the plan.
 4. **Smallest change that moves a metric.** Less code is an outcome of removing what is unused or duplicated, never a target. Do not trade readability, types or tests for a lower line count.
 5. **Detect the stack, never assume it.** Read it from the repo and apply only the checks that fit.
 6. **Build on what the project already has.** A mature repo already has budgets, gates and written decisions. Find them first, verify them, and report only what they miss. A short findings list is a valid result; padding it with generic advice is not.
@@ -25,6 +25,7 @@ These exist because "optimize everything" produces large diffs with no proven be
 - Git: read only. Record the branch, commit and any uncommitted changes, and leave them alone. Use `GIT_OPTIONAL_LOCKS=0` for status and log so no lock files are left behind.
 - Secrets: never print the contents of `.env` files, keys or tokens. Check only that they are ignored by git and which variable names exist (from the example file).
 - Keep throwaway analysis scripts outside the repo.
+- The one thing an audit writes in the project is its own notes: the profile and the dated report in `.claude/optimize-app/` (see "Project memory"). If that folder does not exist yet, deliver the report in the conversation and ask before creating it. Once it exists, write to it without asking.
 
 ## Workflow
 
@@ -37,6 +38,8 @@ These exist because "optimize everything" produces large diffs with no proven be
 "Optimize this" with no detail means a full audit plus a proposed plan. If the repo holds several apps (for example `backend/` and `frontend/`), or the user gave several repos, audit each as its own unit with its own baseline and findings.
 
 ### 2. Detect stack, conventions and existing guardrails
+
+If `.claude/optimize-app/PROFILE.md` exists, read it first, with the latest report in `audits/` (see "Project memory"). It says where this project records its facts, what was already found and what not to report again.
 
 Read, as present: package manifests and lockfiles, framework config, `tsconfig.json`, `pyproject.toml` / `requirements*.txt`, Dockerfiles, CI workflows, `README`, `CONTRIBUTING`, `AGENTS.md` / `CLAUDE.md`, and the `docs/` folder. Note the rendering model (static, server-rendered, client-only), the data layer, and hosting.
 
@@ -81,11 +84,11 @@ Rate each finding on impact (which metric moves, roughly how much), effort (S: u
 
 ### 7. Report
 
-Use "Report format". Deliver in the conversation unless the user asks for a file.
+Use "Report format". Deliver it in the conversation, then save the same report under `audits/` and update the profile (see "Project memory").
 
 ### 8. Implement (fix mode)
 
-Follow the project's own contribution process: issue, branch naming, commit format, required local checks. One finding per change, so each can be reviewed and reverted alone. After each change run the project's checks, then re-measure the metric the finding targeted. If it did not move, revert and say so. Finish with a before/after table.
+Follow the project's own contribution process: issue, branch naming, commit format, required local checks. One finding per change, so each can be reviewed and reverted alone. After each change run the project's checks, then re-measure the metric the finding targeted. If it did not move, revert and say so. Finish with a before/after table, then update each finding's status in the profile.
 
 ### 9. Guard against regression
 
@@ -105,7 +108,7 @@ Review the run and ask:
 
 Then:
 
-1. Keep only lessons that would hold in a different repo with a different stack. Facts about this project (paths, product names, its conventions) belong in the project's own `CLAUDE.md` or `AGENTS.md`, never here.
+1. Keep only lessons that would hold in a different repo with a different stack. Facts about this project (paths, product names, false positives, what paid off) belong in its profile (see "Project memory"). A rule that every session in that repo should follow belongs in its `CLAUDE.md` or `AGENTS.md`. Neither belongs here.
 2. Propose at most five edits. Prefer correcting or replacing an existing line over appending a new one, and delete anything the run showed to be useless. Keep this file under 500 lines; if a section grows, move it to a reference file beside this one and link to it.
 3. Show the changes as a diff and wait for approval. Apply them only when the user agrees, unless they said in advance to apply without asking.
 4. After applying, add one line to `CHANGELOG.md` beside this file: date, kind of repo audited (for example "Next.js marketing site"), what changed and why.
@@ -130,21 +133,19 @@ Do not write a project copy of this skill, and do not create numbered versions o
 
 ### PROFILE.md
 
-Write it from what this audit verified, not from this skill's text. Nothing in it should be true of projects in general. Keep it under about 150 lines and update it in place each audit: correct what changed, delete what no longer applies.
+Write it from what this audit verified, not from this skill's text. Nothing in it should be true of projects in general, and nothing in it should repeat what the repo already records: a copied version number or budget goes stale, and checking the copy costs as much as reading the original, so name the file instead. Keep it under about 150 lines and update it in place each audit: correct what changed, delete what no longer applies.
 
 ```
 # Optimization profile: <project>
 Last audit: <date> · commit <sha> · report: audits/<date>.md
 
-## Stack
-Versions, rendering model, data layer, hosting. One line each.
+## Sources of truth
+The files where the repo itself records its stack, commands, budgets, gates and
+metric history. Paths only: read them, do not copy their contents here.
 
-## Commands
-The exact commands for build, typecheck, lint, tests and budget checks, and where
-they were verified to run (OS, runtime version). Note any that could not run and why.
-
-## Guardrails in place
-Budgets, gates and tests the project enforces, with file paths.
+## Running it here
+What those files do not say: where the checks were verified to run (OS, runtime
+version), which could not run and why, and the traps of this machine or setup.
 
 ## Accepted trade-offs
 Decisions the team made on purpose, each with where it is documented.
@@ -158,17 +159,19 @@ Project-specific checks that paid off, and the modules where problems cluster.
 
 ## Baseline history
 | Date | Commit | <the metrics tracked for this project> |
+Only metrics the repo does not already keep with dates. For the rest, name the file.
 
 ## Findings
 | ID | First seen | Finding | Status |
-Status is open, fixed in <commit>, or declined with the reason.
+Status is open, fixed in <commit>, or declined with the reason. Where a finding has
+a tracker issue, give the issue and let the tracker hold the status.
 ```
 
 In a repo with several apps, keep one profile with a section per app, or one `PROFILE-<app>.md` each if it outgrows the limit.
 
 ### Using the profile on later audits
 
-- Treat it as a cache, not as truth. Confirm that versions, commands and guardrails still match the repo, and re-verify any fact a finding depends on.
+- Treat it as a cache, not as truth. Check that the files it points to still exist and still say what it claims, and re-verify any fact a finding depends on.
 - Keep finding IDs stable. An ID is never reused, and a finding that is still present keeps its ID and first-seen date.
 - Open each report with what changed since the last audit: findings fixed, still open and new, and metric movement against the baseline history.
 - Skip what the profile marks as accepted or as a false positive, unless something about it changed.
@@ -177,6 +180,7 @@ In a repo with several apps, keep one profile with a section per app, or one `PR
 
 - No secrets, tokens or personal data.
 - Check whether `.claude/` is ignored by git and tell the user. Ignored means the files stay on this machine; not ignored means they show up as untracked. Do not commit them unasked. If the team should share them, suggest moving the folder under `docs/`.
+- Ignored files are also missing from every git worktree and fresh clone. Read and write the folder in the main checkout (the first entry of `git worktree list`), even when the audit runs from a worktree.
 - If the folder cannot be written in this environment, deliver the profile and the report in the conversation and say where to save them.
 
 ## Techniques
@@ -318,6 +322,9 @@ One report per app or repo:
 ```
 # Optimization audit: <project>
 Branch <name> · commit <sha> · <date> · uncommitted changes: <none | n files> · Scope: <full | areas>
+
+## Since the last audit
+Only when a profile exists: findings fixed, still open and new, and how the baseline moved.
 
 ## Summary
 Three to five sentences: overall state, the biggest wins available, anything urgent.
