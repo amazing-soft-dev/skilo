@@ -23,6 +23,7 @@ Paths are relative to this skill's folder. Read a reference only at the step tha
 | `references/rubric.md` | Step 6: the 13 scoring categories, grades, severity |
 | `references/edge-cases.md` | When an unusual situation comes up |
 | `scripts/capture.mjs` | Step 3: batch screenshots + measurements with Playwright (`--help`) |
+| `scripts/capture-cdp.mjs` | Step 3: same output without Playwright, driving installed Chrome/Edge over the DevTools protocol (Node ≥ 22) |
 | `scripts/measure.js` | Step 4: page measurements; evaluate in a browser tool when Playwright isn't used |
 | `scripts/locate.js` | Step 4: map an element to its React/Vue/Svelte/Angular/Astro source |
 
@@ -42,7 +43,7 @@ Paths are relative to this skill's folder. Read a reference only at the step tha
 ### Step 0: Intake
 1. Read `.design-review/PROFILE.md` if it exists: audience lens, accepted exceptions, overrides, last score.
 2. Detect the framework, routes, styling system and UI libraries (`frameworks.md`, `styling.md`).
-3. Inventory the intended design system from code: colors, type scale, spacing, radii, shadows, breakpoints, containers, fonts.
+3. Inventory the intended design system from code: colors, type scale, spacing, radii, shadows, breakpoints, containers, fonts. Read design docs if present (DESIGN.md, a brand guide, a template audit such as `docs/audit/`) and record deliberate choices under "Brand decisions" in PROFILE.md so they aren't "fixed" later.
 4. Set up `.design-review/` and `.gitignore` (see "Where files go") before writing anything else.
 5. Create a task list and `.design-review/runs/<date>/progress.md` so a long run can resume.
 
@@ -50,17 +51,24 @@ Paths are relative to this skill's folder. Read a reference only at the step tha
 Write the audience profile (template in `lenses.md`): industry and business goal, primary and secondary audiences, context of use, each audience's main path. Sources: the user, PROFILE.md, DESIGN.md/CLAUDE.md/README, site copy, analytics the user shares. Pick and combine lenses; they change thresholds, weights and red flags but never lower WCAG minimums. Record the lens in PROFILE.md.
 
 ### Step 2: Preflight
-Choose the evidence level and state it: **rendered + code** (best), **code + screenshots**, or **code only** (visual findings Inferred). Get the site running or use the user's URL (`frameworks.md` → Run the site). Never invent secrets or use real users' credentials.
+Choose the evidence level and state it: **rendered + code** (best), **code + screenshots**, or **code only** (visual findings Inferred). Get the site running or use the user's URL (`frameworks.md` → Run the site). Never invent secrets or use real users' credentials. Production builds can take minutes: start the build in the background and do the Step 5 code reading while it runs. If serving it needs a local run config (for example a `.claude/launch.json` entry), add it and say so in Assumptions.
 
 ### Step 3: Capture at many resolutions
 - **Playwright available** (in the project or globally): run
   `node <skill>/scripts/capture.mjs --url <base> --pages /,/pricing --viewports core --themes light,dark --breakpoints <project breakpoints> --out .design-review/runs/<date>`
   then again with `--viewports extended` for key pages. It saves above-the-fold and full-page screenshots plus measurement JSON per page × viewport × theme, and `capture-summary.json`. Use `--dark-class` for class-based dark mode.
-- **Otherwise:** use the session's browser tool (load its skill first) at the same viewports, and evaluate `scripts/measure.js` per capture.
+- **No Playwright package, but Chrome or Edge installed:** run `scripts/capture-cdp.mjs` with the same arguments plus `--measure <skill>/scripts/measure.js`. It writes the same files and needs no install.
+- **Otherwise:** use the session's browser tool (load its skill first) at the same viewports, and evaluate `scripts/measure.js` per capture. Browser-tool screenshots aren't saved to disk, so the report cites measurements instead of image paths.
+- **Windows Git Bash:** prefix the command with `MSYS_NO_PATHCONV=1`, or `--pages /` becomes `C:/Program Files/Git/`.
 - In a browser tool, also capture what a batch run can't: hover and keyboard focus, menus, modals, accordions, form states (never submit to real endpoints), loading, error, 404, empty lists, 200% zoom, stress content (long titles, missing images, longest locale), at one phone and one desktop width.
 
 ### Step 4: Measure and map to source
-Every color, size and spacing finding quotes a measured value from the measurement JSON. Map elements to code with `scripts/locate.js` in dev builds, or grep for visible text and class names (`frameworks.md` → Element → source).
+Every color, size and spacing finding quotes a measured value from the measurement JSON. Read it critically:
+- `contrastIssues` lists real failures (`ratio < need`) and text over images (`overImage: true`, often 21:1). Treat the second kind as "check in the screenshot", not as failures.
+- `cardSets` only detects cards with a border radius. On square-cornered designs it comes back empty; measure card widths in a browser tool instead and say so in "Not checked".
+- `smallTargets` repeats on every page for shared header/footer controls; report them once.
+
+Map elements to code with `scripts/locate.js` in dev builds, or grep for visible text and class names (`frameworks.md` → Element → source).
 
 ### Step 5: Code review
 Check the design-facing code smells in `styling.md` for the project's systems (raw values instead of tokens, variant sprawl, removed focus, image components, fonts, motion guards, fragile grids, missing states).
@@ -76,7 +84,7 @@ Write `.design-review/runs/<date>/report.md`:
 
 ```
 # Design review: <site> (<date>)
-Grade: B (82/100) · Evidence: rendered + code (staging) · Stack: <framework> + <styling>
+Grade: B (82/100) · Projected after Blocker/High fixes: A (91) · Evidence: rendered + code (staging) · Stack: <framework> + <styling>
 Audience: <primary> + <secondary> · Industry: <industry> · Lens: <lens names>
 Pages: 6 · Viewports: 7 core + 8 extended + breakpoint edges · Themes: light/dark
 Blockers 1 · High 4 · Medium 9 · Nits 6 · Accepted exceptions skipped: 2
@@ -94,7 +102,12 @@ Blockers 1 · High 4 · Medium 9 · Nits 6 · Accepted exceptions skipped: 2
 ## Before/after (fix mode)
 ```
 
-In chat: grade, the audience in one line, top 5 changes, the report path, whether `.gitignore` was updated, and an offer of fix mode.
+A low grade can come from the rubric's scale (2/4 "acceptable" earns 50% of a category), so when most categories are 2–3 say in one line under the grade what drives it and what the projected grade is.
+
+In chat: grade (with the projection), the audience in one line, top 5 changes, the report path, whether `.gitignore` was updated, and an offer of fix mode.
+
+### Step 9: Improve this skill
+After the report, look back at the run: where the scripts or references failed, misled or were missing (a tool not installed, a false positive, a mangled argument, a rule the lens didn't cover, a calibration that felt wrong). Propose changes to this skill's files as a unified diff in chat, one short reason per change, and **wait for the user's approval before applying**. Never edit the skill folder without approval, and never put project details (names, URLs, findings) into the skill.
 
 ## Fix mode
 
@@ -132,7 +145,7 @@ The skill lives in a skills folder (`~/.claude/skills/` for personal use, or a r
 3. If files under `runs/` are already tracked, tell the user and give `git rm -r --cached .design-review/runs`; don't run it unless asked.
 4. Say in the report and in chat whether the line was already there or added.
 
-This is the only file outside `.design-review/` that review mode changes. Not a git repo: skip this step and say so. User doesn't want files in the project: write to `~/.design-review/<project-name>/` and say where.
+This is the only tracked file outside `.design-review/` that review mode changes; "report only" or "don't change code" still allows it, so say you added it. Not a git repo: skip this step and say so. User doesn't want any files in the project ("don't touch the repo"): write to `~/.design-review/<project-name>/`, skip `.gitignore`, and say where.
 
 ## Common mistakes
 - Judging without an audience profile, or applying one audience's taste to another.
@@ -141,4 +154,5 @@ This is the only file outside `.design-review/` that review mode changes. Not a 
 - Reviewing only one or two resolutions.
 - Burying Blockers under Nits; "fixing" deliberate brand choices into generic defaults.
 - Calling code-only judgments Confirmed.
+- Reporting `overImage` contrast flags as failures, or trusting an empty `cardSets` as "no cards".
 - Skipping `.gitignore`, ignoring all of `.design-review/`, or writing outputs into a skills folder.
