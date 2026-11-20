@@ -19,9 +19,13 @@
     const cs = getComputedStyle(el), r = el.getBoundingClientRect();
     ['paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft', 'rowGap', 'columnGap'].forEach(k => { const v = parseFloat(cs[k]); if (v >= 2 && v % 2) odd.add(Math.round(v * 10) / 10 + 'px'); });
     if (cs.backgroundImage.includes('url(') && r.width * r.height > 2500) media.push({ sel: sel(el), src: 'css-background', w: Math.round(r.width), h: Math.round(r.height), aboveFold: r.top + scrollY < innerHeight });
-    if (r.width >= 64 && r.height >= 64 && (el.children.length >= 2 || el.textContent.trim().length > 40) && parseFloat(cs.borderTopLeftRadius) > 0 && el.parentElement &&
-        (cs.boxShadow !== 'none' || parseFloat(cs.borderTopWidth) > 0 || rgba(cs.backgroundColor)[3] > 0)) {
-      const p = el.parentElement; if (!groups.has(p)) groups.set(p, []); groups.get(p).push(el);
+    // Card-like box: a full border, a shadow, or a rounded filled box. Square framed cards count too.
+    const framed = ['Top', 'Right', 'Bottom', 'Left'].every(s => parseFloat(cs['border' + s + 'Width']) > 0);
+    if (r.width >= 64 && r.height >= 64 && r.width < innerWidth * 0.95 && (el.children.length >= 2 || el.textContent.trim().length > 40) && el.parentElement &&
+        (framed || cs.boxShadow !== 'none' || (parseFloat(cs.borderTopLeftRadius) > 0 && rgba(cs.backgroundColor)[3] > 0))) {
+      // Group by the nearest ancestor with several children, so cards wrapped one per <li> or cell still form a set.
+      let p = el.parentElement; while (p.children.length === 1 && p.parentElement && p !== document.body) p = p.parentElement;
+      if (!groups.has(p)) groups.set(p, []); groups.get(p).push(el);
     }
     const own = [...el.childNodes].filter(n => n.nodeType === 3).map(n => n.textContent.trim()).join(' ').trim();
     if (!own) continue;
@@ -48,6 +52,29 @@
     .filter(({ r, inline }) => !inline && (r.width < minT || r.height < minT)).slice(0, 40)
     .map(({ e, r }) => ({ sel: sel(e), w: Math.round(r.width), h: Math.round(r.height) }));
 
+  // Form fields: the outline or the fill must reach 3:1 against the surface around the field (WCAG 1.4.11).
+  // When the input itself is bare, the box drawn by a wrapper up to two levels up is used.
+  const fieldBoundaryIssues = [], placeholderTruncated = [];
+  const drawn = st => ['Top', 'Right', 'Bottom', 'Left'].some(s => parseFloat(st['border' + s + 'Width']) > 0) || rgba(st.backgroundColor)[3] > 0;
+  for (const f of document.querySelectorAll('input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([type=range]):not([type=submit]):not([type=button]),select,textarea')) {
+    const fr = f.getBoundingClientRect();
+    // Skip tiny, off-screen and aria-hidden fields (honeypots and other bot traps).
+    if (!vis(f) || fr.width < 40 || fr.right <= 0 || fr.left >= innerWidth || f.closest('[aria-hidden="true"]')) continue;
+    let box = f; for (let i = 0; i < 2 && !drawn(getComputedStyle(box)) && box.parentElement; i++) box = box.parentElement;
+    const bs = getComputedStyle(box), around = bgOf(box.parentElement || box).color, fill = bgOf(box).color;
+    const side = ['Top', 'Right', 'Bottom', 'Left'].reduce((a, s) => parseFloat(bs['border' + s + 'Width']) > parseFloat(bs['border' + a + 'Width']) ? s : a, 'Bottom');
+    const edge = parseFloat(bs['border' + side + 'Width']) > 0 ? ratio(over(rgba(bs['border' + side + 'Color']), around), around) : 0;
+    const fillR = ratio(fill, around);
+    if (Math.max(edge, fillR) < 3) fieldBoundaryIssues.push({ sel: sel(f), border: edge, fill: fillR, need: 3 });
+    const ph = f.getAttribute('placeholder');
+    if (ph && f.tagName === 'INPUT') {
+      const fs2 = getComputedStyle(f); cx.font = `${fs2.fontStyle} ${fs2.fontWeight} ${fs2.fontSize} ${fs2.fontFamily}`;
+      const w = cx.measureText(ph).width + (parseFloat(fs2.letterSpacing) || 0) * ph.length;
+      const room = f.clientWidth - parseFloat(fs2.paddingLeft) - parseFloat(fs2.paddingRight);
+      if (w > room + 1) placeholderTruncated.push({ sel: sel(f), placeholder: ph.slice(0, 60), textW: Math.round(w), room: Math.round(room) });
+    }
+  }
+
   for (const m of document.querySelectorAll('img,video,picture > img,svg,canvas')) {
     if (!vis(m)) continue;
     const r = m.getBoundingClientRect(); if (r.width * r.height < 2500) continue;
@@ -62,6 +89,6 @@
     fontSizes: sizes, oddSpacing: [...odd],
     contrastIssues: contrast.slice(0, 80),
     lineLengthIssues: lines.filter(l => l.charsPerLine > 80 || l.charsPerLine < 35).slice(0, 40),
-    cardSets, smallTargets, media
+    cardSets, smallTargets, fieldBoundaryIssues: fieldBoundaryIssues.slice(0, 30), placeholderTruncated, media
   };
 })()

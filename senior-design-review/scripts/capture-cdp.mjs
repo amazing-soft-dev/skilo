@@ -72,10 +72,10 @@ for (const vp of viewports) {
       const m = await evaluate(measureSrc);
       mkdirSync(join(out, 'measure'), { recursive: true });
       writeFileSync(join(out, 'measure', `${slug(p)}-${name}.json`), JSON.stringify(m, null, 2));
-      Object.assign(entry, { ok: true, overflow: m.horizontalOverflow, contrastIssues: m.contrastIssues.length, smallTargets: m.smallTargets.length, cardSets: m.cardSets.length, longLines: m.lineLengthIssues.length });
+      Object.assign(entry, { ok: true, overflow: m.horizontalOverflow, contrastIssues: m.contrastIssues.length, smallTargets: m.smallTargets.length, cardSets: m.cardSets.length, longLines: m.lineLengthIssues.length, fieldBoundaries: m.fieldBoundaryIssues.length, truncatedPlaceholders: m.placeholderTruncated.length });
     } catch (e) { Object.assign(entry, { ok: false, error: String(e.message || e).split('\n')[0] }); }
     summary.push(entry);
-    console.log(entry.ok ? `ok   ${p} @ ${entry.viewport}  contrast:${entry.contrastIssues} targets:${entry.smallTargets} overflow:${entry.overflow}` : `FAIL ${p} @ ${entry.viewport}  ${entry.error}`);
+    console.log(entry.ok ? `ok   ${p} @ ${entry.viewport}  contrast:${entry.contrastIssues} targets:${entry.smallTargets} fields:${entry.fieldBoundaries} overflow:${entry.overflow}` : `FAIL ${p} @ ${entry.viewport}  ${entry.error}`);
   }
 }
 mkdirSync(out, { recursive: true });

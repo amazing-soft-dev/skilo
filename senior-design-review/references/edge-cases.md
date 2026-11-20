@@ -11,6 +11,7 @@ Read when one of these situations comes up.
 - **Font swap or hydration flash:** capture after fonts load, but note any visible flash on first load.
 - **Feature flags or A/B tests:** note the variant reviewed.
 - **Third-party embeds** (maps, video, chat, payments, booking widgets): review placement and size, not internals.
+- **The product inside a frame** (the site's own games, editors, players, previews in an iframe or canvas): this is content, not a widget. Review it at phone width like any page: text and control size inside it, and whether full screen or landscape is offered. `measure.js` cannot see inside canvas or cross-origin frames, so findings are from screenshots (Inferred unless measured another way).
 - **Cookie banners, chat widgets, modals covering content:** capture once as components, then dismiss before other captures.
 - **Very large site:** key pages plus one per template; list routes not reviewed.
 - **Monorepo:** review the app that serves the website; ask only if several apps qualify. `.gitignore` goes at the repo root.

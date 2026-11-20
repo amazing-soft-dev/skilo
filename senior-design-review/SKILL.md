@@ -65,8 +65,10 @@ Choose the evidence level and state it: **rendered + code** (best), **code + scr
 ### Step 4: Measure and map to source
 Every color, size and spacing finding quotes a measured value from the measurement JSON. Read it critically:
 - `contrastIssues` lists real failures (`ratio < need`) and text over images (`overImage: true`, often 21:1). Treat the second kind as "check in the screenshot", not as failures.
-- `cardSets` only detects cards with a border radius. On square-cornered designs it comes back empty; measure card widths in a browser tool instead and say so in "Not checked".
+- `cardSets` detects framed boxes (radius, border or shadow) that repeat as siblings. If cards are drawn another way and it comes back empty, measure card widths in a browser tool instead and say so in "Not checked".
 - `smallTargets` repeats on every page for shared header/footer controls; report them once.
+- `fieldBoundaryIssues` lists form fields whose outline and fill both stay under 3:1 against the surface around them; `placeholderTruncated` lists placeholders wider than their field.
+- Measurements are at rest and from the page's own DOM: hover, open menus and content inside canvas or frames need screenshots.
 
 Map elements to code with `scripts/locate.js` in dev builds, or grep for visible text and class names (`frameworks.md` → Element → source).
 
@@ -78,6 +80,11 @@ Score the 13 categories in `rubric.md` with the lens weights. Look at the screen
 
 ### Step 7: Findings
 Each finding: ID by category, severity (Blocker / High / Medium / Nit, defined in `rubric.md`), Confirmed or Inferred, page @ viewport @ theme, selector and `file:line`, which audience it affects, the rule and its source, an **exact fix in the project's system** ("Change X to Y because Z", with the new measured value), and effort S/M/L. Group repeats into one finding; name what works well.
+
+Before writing a fix, check that it fits:
+- **Measure the room it needs.** "Keep it on one line", "make it bigger" or "add padding" must fit the available width or height at every tested viewport; if it only fits in some places, say where and give the alternative for the rest.
+- **Check shared components everywhere they appear.** A header, banner, card or button used on several pages or in several contexts (hero vs footer, desktop vs phone) needs a fix that works in all of them, or a named variant for the one that differs.
+- **Give the expected result, not just the change:** the new measured value or position (for example where the primary action lands at 1366×768), so the fix can be verified.
 
 ### Step 8: Report
 Write `.design-review/runs/<date>/report.md`:

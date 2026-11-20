@@ -28,7 +28,7 @@ Source: user | PROFILE.md | DESIGN.md/README | site copy (inferred)
 | Engineers / developers | Scannability, density done well, code blocks (syntax-theme contrast, copy button, horizontal scroll), docs navigation (sidebar, search, anchors), tables, dark mode | Dense layouts, little decoration, monospace accents | Vague marketing hero, stock photos, hidden pricing or docs, low-contrast code |
 | General consumers | Mobile-first, fast path to the CTA, social proof, plain words | | Long intros before value, cluttered heroes |
 | B2B buyers / decision makers | Credibility (logos, case studies, numbers), pricing clarity, comparison tables, demo/contact CTA; desktop 1366–1920 | Denser content | Unproven claims, no pricing signal, generic illustrations |
-| Children / teens | Large targets, simple words, bright but controlled palette, clear parental/privacy cues | Playful type and color | Dark patterns, ads that look like content |
+| Children / teens | Large targets, simple words, bright but controlled palette, clear parental/privacy cues, body text that is not light weight | Playful type and color | Dark patterns, ads that look like content, real-looking faces beside user names or handles, small thin text |
 | Low literacy / non-native speakers | Plain language, short sentences, icons with labels, room for longer translations | | Idioms, dense paragraphs, icon-only UI |
 | On-the-go / deskless workers | One-hand reach, thumb-zone CTAs, big buttons, outdoor (sunlight) contrast, light pages for weak networks | | Small targets, hover-dependent UI, heavy hero media |
 
