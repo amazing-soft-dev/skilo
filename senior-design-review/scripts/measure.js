@@ -8,7 +8,12 @@
   const over = (t, b) => { const a = t[3] + b[3] * (1 - t[3]); if (!a) return [255, 255, 255, 0]; return [0, 1, 2].map(i => (t[i] * t[3] + b[i] * b[3] * (1 - t[3])) / a).concat(a); };
   const lum = ([r, g, b]) => { const f = v => { v /= 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); };
   const ratio = (a, b) => { const [h, l] = [lum(a), lum(b)].sort((x, y) => y - x); return Math.floor(((h + 0.05) / (l + 0.05)) * 100) / 100; };
-  const bgOf = el => { const layers = []; let img = false; for (let e = el; e; e = e.parentElement) { const cs = getComputedStyle(e); if (cs.backgroundImage !== 'none') img = true; const c = rgba(cs.backgroundColor); if (c[3] > 0) { layers.push(c); if (c[3] >= 1) break; } } let out = [255, 255, 255, 1]; for (let i = layers.length - 1; i >= 0; i--) out = over(layers[i], out); return { color: out, overImage: img }; };
+  // The background is composed from the element's ancestors. That is wrong for a see-through surface that
+  // sits on top of other content (a fixed or sticky bar, an overlay, anything with a backdrop filter): what
+  // shows through it is whatever is painted underneath, not its ancestors. A failure computed on such a
+  // surface is marked overBackdrop: the ratio is a guess until the pixels are sampled in a screenshot.
+  const lifted = cs => (cs.backdropFilter && cs.backdropFilter !== 'none') || ['fixed', 'sticky', 'absolute'].includes(cs.position);
+  const bgOf = el => { const layers = []; let img = false, backdrop = false; for (let e = el; e; e = e.parentElement) { const cs = getComputedStyle(e); if (cs.backgroundImage !== 'none') img = true; const c = rgba(cs.backgroundColor); if (c[3] > 0) { layers.push(c); if (c[3] >= 1) break; if (lifted(cs)) backdrop = true; } } let out = [255, 255, 255, 1]; for (let i = layers.length - 1; i >= 0; i--) out = over(layers[i], out); return { color: out, overImage: img, overBackdrop: backdrop }; };
   const vis = el => { const r = el.getBoundingClientRect(), cs = getComputedStyle(el); return r.width > 0 && r.height > 0 && cs.visibility !== 'hidden' && cs.display !== 'none' && +cs.opacity > 0; };
   const sel = el => el.id ? '#' + el.id : el.tagName.toLowerCase() + (typeof el.className === 'string' && el.className.trim() ? '.' + el.className.trim().split(/\s+/).slice(0, 3).join('.') : '');
   const lhOf = cs => cs.lineHeight === 'normal' ? parseFloat(cs.fontSize) * 1.2 : parseFloat(cs.lineHeight);
@@ -33,7 +38,7 @@
     sizes[cs.fontSize] = (sizes[cs.fontSize] || 0) + 1;
     const bg = bgOf(el), fg = over(rgba(cs.color), bg.color), cr = ratio(fg, bg.color);
     const large = fs >= 24 || (fs >= 18.66 && fw >= 700), need = large ? 3 : 4.5;
-    if (cr < need || bg.overImage) contrast.push({ sel: sel(el), text: own.slice(0, 60), fontSize: cs.fontSize, ratio: cr, need, overImage: bg.overImage });
+    if (cr < need || bg.overImage) contrast.push({ sel: sel(el), text: own.slice(0, 60), fontSize: cs.fontSize, ratio: cr, need, overImage: bg.overImage, overBackdrop: bg.overBackdrop });
     const len = el.textContent.trim().length;
     if (len > 120) { const n = Math.max(1, Math.round(r.height / lhOf(cs))); lines.push({ sel: sel(el), charsPerLine: Math.round(len / n), fontSize: cs.fontSize, lineHeight: +(lhOf(cs) / fs).toFixed(2) }); }
   }
@@ -55,7 +60,13 @@
   // Form fields: the outline or the fill must reach 3:1 against the surface around the field (WCAG 1.4.11).
   // When the input itself is bare, the box drawn by a wrapper up to two levels up is used.
   const fieldBoundaryIssues = [], placeholderTruncated = [];
-  const drawn = st => ['Top', 'Right', 'Bottom', 'Left'].some(s => parseFloat(st['border' + s + 'Width']) > 0) || rgba(st.backgroundColor)[3] > 0;
+  // An outline drawn as a ring: a box-shadow layer with no offset and no blur and at least 1px of spread
+  // (utility-class rings and many UI kits outline fields this way instead of with a border).
+  const rings = st => st.boxShadow === 'none' ? [] : st.boxShadow.split(/,(?![^(]*\))/).map(part => {
+    const m = part.trim().match(/^(.+?)\s+(-?[\d.]+)px\s+(-?[\d.]+)px\s+(-?[\d.]+)px\s+(-?[\d.]+)px(?:\s+inset)?$/);
+    return m && !+m[2] && !+m[3] && !+m[4] && +m[5] >= 1 ? rgba(m[1]) : null;
+  }).filter(c => c && c[3] > 0);
+  const drawn = st => ['Top', 'Right', 'Bottom', 'Left'].some(s => parseFloat(st['border' + s + 'Width']) > 0) || rgba(st.backgroundColor)[3] > 0 || rings(st).length > 0;
   for (const f of document.querySelectorAll('input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([type=range]):not([type=submit]):not([type=button]),select,textarea')) {
     const fr = f.getBoundingClientRect();
     // Skip tiny, off-screen and aria-hidden fields (honeypots and other bot traps).
@@ -63,7 +74,8 @@
     let box = f; for (let i = 0; i < 2 && !drawn(getComputedStyle(box)) && box.parentElement; i++) box = box.parentElement;
     const bs = getComputedStyle(box), around = bgOf(box.parentElement || box).color, fill = bgOf(box).color;
     const side = ['Top', 'Right', 'Bottom', 'Left'].reduce((a, s) => parseFloat(bs['border' + s + 'Width']) > parseFloat(bs['border' + a + 'Width']) ? s : a, 'Bottom');
-    const edge = parseFloat(bs['border' + side + 'Width']) > 0 ? ratio(over(rgba(bs['border' + side + 'Color']), around), around) : 0;
+    const borderR = parseFloat(bs['border' + side + 'Width']) > 0 ? ratio(over(rgba(bs['border' + side + 'Color']), around), around) : 0;
+    const edge = Math.max(borderR, ...rings(bs).map(c => ratio(over(c, around), around)));
     const fillR = ratio(fill, around);
     if (Math.max(edge, fillR) < 3) fieldBoundaryIssues.push({ sel: sel(f), border: edge, fill: fillR, need: 3 });
     const ph = f.getAttribute('placeholder');
@@ -87,7 +99,8 @@
     theme: document.documentElement.classList.contains('dark') || matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light',
     horizontalOverflow: document.documentElement.scrollWidth > innerWidth,
     fontSizes: sizes, oddSpacing: [...odd],
-    contrastIssues: contrast.slice(0, 80),
+    // Most certain first, so the "check in the screenshot" entries never push a computed failure past the cap.
+    contrastIssues: contrast.sort((a, b) => (a.overImage ? 2 : a.overBackdrop ? 1 : 0) - (b.overImage ? 2 : b.overBackdrop ? 1 : 0)).slice(0, 80),
     lineLengthIssues: lines.filter(l => l.charsPerLine > 80 || l.charsPerLine < 35).slice(0, 40),
     cardSets, smallTargets, fieldBoundaryIssues: fieldBoundaryIssues.slice(0, 30), placeholderTruncated, media
   };

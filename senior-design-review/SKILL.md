@@ -57,17 +57,17 @@ Choose the evidence level and state it: **rendered + code** (best), **code + scr
 - **Playwright available** (in the project or globally): run
   `node <skill>/scripts/capture.mjs --url <base> --pages /,/pricing --viewports core --themes light,dark --breakpoints <project breakpoints> --out .design-review/runs/<date>`
   then again with `--viewports extended` for key pages. It saves above-the-fold and full-page screenshots plus measurement JSON per page × viewport × theme, and `capture-summary.json`. Use `--dark-class` for class-based dark mode.
-- **No Playwright package, but Chrome or Edge installed:** run `scripts/capture-cdp.mjs` with the same arguments plus `--measure <skill>/scripts/measure.js`. It writes the same files and needs no install.
+- **No Playwright package, but Chrome or Edge installed:** run `scripts/capture-cdp.mjs` with the same arguments (`--help` lists them). It writes the same files and needs no install.
 - **Otherwise:** use the session's browser tool (load its skill first) at the same viewports, and evaluate `scripts/measure.js` per capture. Browser-tool screenshots aren't saved to disk, so the report cites measurements instead of image paths.
 - **Windows Git Bash:** prefix the command with `MSYS_NO_PATHCONV=1`, or `--pages /` becomes `C:/Program Files/Git/`.
 - In a browser tool, also capture what a batch run can't: hover and keyboard focus, menus, modals, accordions, form states (never submit to real endpoints), loading, error, 404, empty lists, 200% zoom, stress content (long titles, missing images, longest locale), at one phone and one desktop width.
 
 ### Step 4: Measure and map to source
 Every color, size and spacing finding quotes a measured value from the measurement JSON. Read it critically:
-- `contrastIssues` lists real failures (`ratio < need`) and text over images (`overImage: true`, often 21:1). Treat the second kind as "check in the screenshot", not as failures.
+- `contrastIssues` lists computed failures (`ratio < need`) first, then two kinds where the ratio is a guess. A failure marked `overBackdrop: true` is on a see-through surface that floats over other content (a fixed, sticky or overlaid bar, a backdrop-filter panel), so its background was composed from the wrong layers. Text over images (`overImage: true`, often 21:1) is listed whatever its ratio. For both, sample the pixels behind the text in the screenshot before calling it a failure or a pass.
 - `cardSets` detects framed boxes (radius, border or shadow) that repeat as siblings. If cards are drawn another way and it comes back empty, measure card widths in a browser tool instead and say so in "Not checked".
 - `smallTargets` repeats on every page for shared header/footer controls; report them once.
-- `fieldBoundaryIssues` lists form fields whose outline and fill both stay under 3:1 against the surface around them; `placeholderTruncated` lists placeholders wider than their field.
+- `fieldBoundaryIssues` lists form fields whose outline (a border, or a ring drawn as a box-shadow) and fill both stay under 3:1 against the surface around them; `placeholderTruncated` lists placeholders wider than their field.
 - Measurements are at rest and from the page's own DOM: hover, open menus and content inside canvas or frames need screenshots.
 
 Map elements to code with `scripts/locate.js` in dev builds, or grep for visible text and class names (`frameworks.md` → Element → source).
@@ -123,7 +123,7 @@ When the user says fix, apply or polish (all, by severity, or by IDs):
 2. One finding per change, smallest change, in the project's framework and tokens (`styling.md`). One commit per finding if the user wants commits; never push.
 3. **Ask first** before changing brand colors, fonts or logo; rewriting the meaning of copy; removing images, sections or content; restructuring navigation or layouts across many pages; adding dependencies or a UI library.
 4. Re-capture the same pages, viewports and themes into `runs/<date>/after/`, re-measure, re-score, note regressions.
-5. Run the project's lint, typecheck and tests if present.
+5. Run the project's lint, typecheck and tests if present. When each finding gets its own branch, run the tests on each branch alone, not only on all of them combined: a markup change can trip a guard test that counts elements or compares a snapshot (an animation inventory, a DOM or visual baseline), and that branch must carry the updated baseline itself.
 
 ## Scoped modes
 - **"Review my changes" / PR:** `git diff` against the base branch → affected components/templates → the routes using them, plus global effects of token or theme changes.
@@ -161,5 +161,5 @@ This is the only tracked file outside `.design-review/` that review mode changes
 - Reviewing only one or two resolutions.
 - Burying Blockers under Nits; "fixing" deliberate brand choices into generic defaults.
 - Calling code-only judgments Confirmed.
-- Reporting `overImage` contrast flags as failures, or trusting an empty `cardSets` as "no cards".
+- Reporting `overImage` or `overBackdrop` contrast flags as failures, or trusting an empty `cardSets` as "no cards".
 - Skipping `.gitignore`, ignoring all of `.design-review/`, or writing outputs into a skills folder.
