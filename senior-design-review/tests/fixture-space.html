@@ -1,0 +1,137 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>space fixture</title>
+<style>
+  body { margin: 0; font: 18px/1.6 system-ui, sans-serif; background: #0f1a30; color: #eef; }
+  html { overflow-y: scroll; }
+  ::-webkit-scrollbar { width: 15px; } ::-webkit-scrollbar-thumb { background: #456; }
+  /* zero-height sticky wrapper around the real bar (a common header pattern) */
+  header { position: sticky; top: 0; height: 0; z-index: 5; }
+  header .bar { height: 64px; background: #0b1222; display: flex; align-items: center; padding: 0 24px; }
+  .reveal { opacity: 0; transform: translateY(24px); transition: opacity .6s, transform .6s; }
+  .reveal.in { opacity: 1; transform: none; }
+  .mobile-bar { display: none; }
+  @media (max-width: 767px) { .mobile-bar { display: flex; position: fixed; left: 0; right: 0; bottom: 0; height: 64px; background: #123; } .row, .grid4 { flex-direction: column; display: flex; } }
+  .wrap { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+  section { padding: 64px 0; }
+  .card { background: #1b2a48; border-radius: 16px; padding: 24px; }
+  .btn { display: inline-block; padding: 12px 24px; border-radius: 999px; background: #43c6cf; color: #001; text-decoration: none; }
+  .btn.ghost { background: transparent; border: 2px solid #fff; color: #fff; }
+  .row { display: flex; gap: 32px; }
+  .grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+  .band-blue { background: #16467c; }
+  .band-dark { background: #0b1120; }
+  p { margin: 0 0 1em; }
+  .tight p { margin: 0; }
+</style></head>
+<body>
+<div class="utility" style="height:40px;background:#050a14;font-size:14px;padding:8px 24px">Free help. No cost to you.</div>
+<header><div class="bar">Header</div></header>
+<main>
+  <!-- S6: hero that does not fit a short laptop screen (big padding, breadcrumb, pill, huge headline) -->
+  <section id="hero" style="padding-top:120px">
+    <div class="wrap row" style="align-items:center">
+      <div style="flex:1">
+        <nav>Home › Guides › Getting started</nav>
+        <div style="position:relative;height:120px;margin:12px 0"><img alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10'%3E%3Crect width='10' height='10' fill='%23222'/%3E%3C/svg%3E" style="position:absolute;inset:0;width:100%;height:100%"><p id="on-photo" style="position:relative;color:#fff;margin:0;padding:40px 16px">White text on a photo</p></div>
+        <span style="display:inline-block;border:1px solid #fff;border-radius:999px;padding:4px 12px;margin:24px 0">Getting started</span>
+        <h1 style="font-size:64px;line-height:1.1;margin:0 0 24px">Your step-by-step guide to getting started</h1>
+        <p>What to do, and when, depends mostly on one question: are you new, or switching from another provider?</p>
+        <a class="btn" id="hero-cta" href="#">I'm new here</a> <a class="btn ghost" href="#">I'm switching</a>
+      </div>
+      <div style="flex:1"><div style="height:420px;background:#345;border-radius:16px" role="img" aria-label="photo"></div></div>
+    </div>
+  </section>
+
+  <!-- S2: short column centered beside a much taller card (should suggest sticky) -->
+  <section id="unequal" style="overflow:hidden">
+    <div class="wrap row" style="align-items:center">
+      <div id="short-col" style="flex:1"><h2 style="margin:0 0 16px">A plan match that explains itself</h2><p>Answer a few plain questions.</p><a class="btn" href="#">Get my free plan match</a></div>
+      <div id="tall-col" class="card" style="flex:1"><h3>Option A with the add-on plan</h3>
+        <p>Reason one is long enough to wrap onto a few lines of text for realism.</p><p>Reason two is long enough to wrap onto a few lines of text for realism.</p>
+        <p>Reason three is long enough to wrap onto a few lines of text for realism.</p><p>Trade-off one with some explanation that runs a little longer than one line.</p>
+        <p>Trade-off two with some explanation that runs a little longer than one line.</p><p>Trade-off three with some explanation that runs a little longer than one line.</p>
+        <p>Example for someone who travels often and wants to keep their doctors and predictable costs.</p></div>
+    </div>
+  </section>
+
+  <!-- S3: four cards with min-height much taller than their 2-3 lines, plus big gap after -->
+  <section id="cards" style="padding-bottom:160px">
+    <div class="wrap grid4">
+      <div class="card feat" style="min-height:240px">Suggests an option type, never a vendor.</div>
+      <div class="card feat" style="min-height:240px">Three plain reasons it fits you.</div>
+      <div class="card feat" style="min-height:240px">Lists free help too: public tools and local advisers.</div>
+      <div class="card feat" style="min-height:240px">A specialist reviews every match with you.</div>
+    </div>
+  </section>
+
+  <!-- S1: huge empty band before a section heading, and an action stranded far right of its text -->
+  <section id="reviews" style="padding-top:260px">
+    <div class="wrap row" style="justify-content:space-between;align-items:flex-end">
+      <div><h2 style="margin:0">Read what our clients say</h2><p style="margin:8px 0 0">Real reviews from public review sites, shared with permission.</p></div>
+      <a class="btn" id="far-btn" href="#">Read reviews</a>
+    </div>
+  </section>
+
+  <!-- S4: disclaimer box touching the bottom of its band, uneven top/bottom space -->
+  <section id="disclaimer-band" class="band-dark" style="padding:24px 0 0">
+    <div class="wrap"><div class="card" id="disclaimer" style="border-left:3px solid #43c6cf">We don't offer every option in your region. Check the official directory for all options.</div></div>
+  </section>
+
+  <!-- S5: image card touching the top of its band -->
+  <section id="photo-band" class="band-blue" style="padding:0 0 48px">
+    <div class="wrap"><div id="photo" style="height:260px;border-radius:16px;background:linear-gradient(90deg,#123,#567)" role="img" aria-label="team photo"></div></div>
+  </section>
+
+  <!-- S7: action row stranded between big empty spaces -->
+  <section id="actions" style="padding:40px 0 0">
+    <div class="wrap">
+      <div class="row"><div class="card" style="flex:1">Deadline one: within 8 months.</div><div class="card" style="flex:1">Deadline two: each month you wait.</div></div>
+      <div id="orphan-row" style="margin:120px 0 180px"><a class="btn" href="#">Download as PDF</a> <a class="btn ghost" href="#">Print this page</a></div>
+    </div>
+  </section>
+
+  <!-- sticky scroll-stacking cards: content inside sticky elements must still count -->
+  <section id="stack">
+    <div class="wrap">
+      <h2 style="margin:0 0 16px">Two paths</h2>
+      <div class="card" style="position:sticky;top:80px;margin-bottom:16px">Path 1: the standard option plus an add-on, explained in plain words.</div>
+      <div class="card" style="position:sticky;top:96px">Path 2: the all-in-one option, explained in plain words.</div>
+    </div>
+  </section>
+
+  <!-- scroll-reveal content: hidden until a script reveals it -->
+  <section id="reveal-sec">
+    <div class="wrap"><h2 style="margin:0 0 16px">Revealed on scroll</h2><div id="js-anim" style="opacity:0.001"><p>Content inside a wrapper a JS animation left at 0.001.</p></div>
+      <p class="reveal" id="rev">This paragraph fades in only when a script sees it on screen.</p>
+      <div class="reveal" id="rev-img" style="position:relative;height:200px;margin-top:16px"><img alt="revealed photo" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10'%3E%3Crect width='10' height='10' fill='%23567'/%3E%3C/svg%3E" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover"></div></div>
+  </section>
+
+  <!-- cramped paragraphs + heading closer to the previous block than to its content -->
+  <section id="text" class="tight">
+    <div class="wrap">
+      <p>First paragraph with no margin below it so the next one runs straight on.</p>
+      <p>Second paragraph glued to the first.</p>
+      <h2 style="margin:8px 0 48px">Heading that floats away from its content</h2>
+      <p>Content of the heading.</p>
+    </div>
+  </section>
+
+  <!-- NEGATIVES: well spaced content that must not be flagged -->
+  <section id="good" class="band-blue">
+    <div class="wrap">
+      <span style="font-size:14px;display:inline-block;border:1px solid #fff;border-radius:99px;padding:2px 10px">Eyebrow label</span>
+      <h2 style="margin:12px 0 40px">Well spaced section with an eyebrow</h2>
+      <p>Normal paragraph one.</p><p>Normal paragraph two.</p>
+      <div class="row"><div class="card good" style="flex:1">Balanced card one with a short line.</div><div class="card good" style="flex:1">Balanced card two with a short line.</div></div>
+      <p style="margin-top:24px"><a class="btn" href="#">Primary action close to its content</a></p>
+      <div class="row" style="margin-top:48px"><h3 id="side-head" style="margin:0;flex:0 0 30%">Heading beside its content</h3><div style="flex:1"><div style="height:60px"></div><p style="margin:0">Content that starts lower, in the right-hand column.</p></div></div>
+    </div>
+  </section>
+</main>
+<nav class="mobile-bar">Call · Contact</nav>
+<script>
+  const io = new IntersectionObserver(es => es.forEach(e => e.target.classList.toggle('in', e.isIntersecting)));
+  document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+</script>
+<footer style="padding:48px 24px;background:#050a14"><h2 style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap">Site information</h2>Footer text</footer>
+</body></html>
