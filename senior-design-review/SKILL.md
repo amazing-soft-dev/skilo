@@ -1,6 +1,6 @@
 ---
 name: senior-design-review
-description: Review a website you built (UI + code, any framework) like a senior designer, judged for its industry and audience: color, hierarchy, sizing, text vs image, many resolutions. Scored fixes.
+description: Review a website you built (UI + code, any framework) like a senior designer, judged for its industry and audience. Space use (empty bands, gaps, edges, columns, first screen), hierarchy, type, color, imagery, hover and icon details, many resolutions. Scored fixes.
 ---
 
 # Senior Design Review
@@ -11,123 +11,102 @@ Works for any web stack (React/Next, Vue/Nuxt, Svelte, Angular, Astro, Django, R
 
 This skill **judges**. Performance, SEO, security or deep accessibility audits → `/optimize-app`. Teardown or clone of someone else's site → `/website-audit-and-clone`.
 
+## How this skill runs: micro-passes and a ledger
+
+A review is many small passes, never one big look. Each pass checks **one thing** (empty space between sections, boxes touching section edges, the first screen, hover states…) across every page and viewport, using only its own evidence.
+
+1. `node <skill>/scripts/ledger.mjs next --run <run>` names the next pass and its open cells (page × viewport).
+2. Read **only** that pass's file in `references/passes/`. Don't read the others yet.
+3. Get only that pass's evidence: `ledger.mjs extract --pass <name>` (Playwright/CDP runs), or the pass file's snippet (browser-tool runs).
+4. Judge it, with screenshots where the pass file says so. Write `findings/<pass>.md` (write "No findings", with what was checked, if there are none).
+5. `ledger.mjs mark --pass <name> --status done` for the cells you actually checked. If a cell can't be checked now, mark it `skipped` with a reason and keep going. Mark it `blocked` only after 2 attempts, or with `--permanent` when a retry can't help (no source code access, auth wall). Blocked cells end up under "Not checked".
+6. Back to step 1. Stop only when `next` says nothing is open.
+
+Before the report: `ledger.mjs verify` must say READY. If it doesn't, retry what it lists (skipped cells first). Then run the final check (Step 3 below). The ledger is the memory of the run: after a break or a context reset, `ledger.mjs status` shows exactly where to resume.
+
 ## Files in this skill
 
-Paths are relative to this skill's folder. Read a reference only at the step that needs it; run scripts rather than reading them.
+Paths are relative to this skill's folder. Read a file only when its pass comes up; run scripts rather than reading them.
 
-| File | Use at |
+| File | Use |
 |---|---|
-| `references/lenses.md` | Step 1: audience & industry lenses, weight shifts |
-| `references/frameworks.md` | Steps 0, 2, 3: stack detection, run commands, viewports, breakpoints, element → source |
-| `references/styling.md` | Step 5 and every fix: tokens per styling system, code smells, fix translation |
-| `references/rubric.md` | Step 6: the 13 scoring categories, grades, severity |
+| `references/passes/*.md` | One small file per pass, read when `ledger next` names it |
+| `references/lenses.md` | Lens pass: audience & industry lenses, weight shifts, **space thresholds per lens** |
+| `references/frameworks.md` | Intake and capture: stack detection, run commands, viewports, breakpoints, element → source |
+| `references/styling.md` | Code pass and every fix: tokens per styling system, code smells, fix translation |
+| `references/rubric.md` | Score pass: the 14 categories, weights, grades, severity |
 | `references/edge-cases.md` | When an unusual situation comes up |
-| `scripts/capture.mjs` | Step 3: batch screenshots + measurements with Playwright (`--help`) |
-| `scripts/capture-cdp.mjs` | Step 3: same output without Playwright, driving installed Chrome/Edge over the DevTools protocol (Node ≥ 22) |
-| `scripts/measure.js` | Step 4: page measurements; evaluate in a browser tool when Playwright isn't used |
-| `scripts/locate.js` | Step 4: map an element to its React/Vue/Svelte/Angular/Astro source |
+| `scripts/ledger.mjs` | The pass ledger: init, next, extract, mark, verify, notchecked (`--help`) |
+| `scripts/capture.mjs` | Batch screenshots + measurements with Playwright (`--help`) |
+| `scripts/capture-cdp.mjs` | Same output without Playwright, driving installed Chrome/Edge over the DevTools protocol (Node ≥ 22) |
+| `scripts/batch.js` | Browser-tool runs: measures many pages × viewports via same-origin iframes, in the background |
+| `scripts/bundle.js` | settle + measure + space + batch in one paste for browser tools (rebuild with `node scripts/bundle.mjs`, which also prints the function lengths that verify a paste) |
+| `scripts/settle.js` | Puts the page in its final visible state (scroll-reveal, entrance animations) before measuring |
+| `scripts/measure.js` | Contrast, type sizes, cards, targets, fields, media |
+| `scripts/space.js` | Space use: gaps, empty bands, edges, columns, fill, stranded actions, first-screen fit, and the CSS causing each (lens thresholds via `--opts`) |
+| `scripts/locate.js` | Map an element to its React/Vue/Svelte/Angular/Astro source |
+| `tests/fixture-space.html`, `tests/selftest.mjs` | A page with every space defect plus well-spaced controls, and a self-test that checks the scripts still find each one (`node tests/selftest.mjs`, needs Chrome/Edge) |
 
 ## Defaults (don't ask; write them in an Assumptions block)
 
 | Decision | Default |
 |---|---|
 | Mode | **Review only**; no source changes. Fix mode only when the user says fix / apply / polish |
-| Audience & industry | Inferred (Step 1). One question allowed only if it can't be inferred |
+| Audience & industry | Inferred (lens pass). One question allowed only if it can't be inferred |
 | Pages | Home, main landing pages, pricing, signup/login, main app screen, one per dynamic template, 404. Every route if 10 or fewer |
-| Resolutions | Core viewports on every page, extended on key pages, breakpoint edges (`frameworks.md`) |
+| Resolutions | Core viewports on every page; short-laptop (`fold`) and extended viewports on key pages; breakpoint edges (`frameworks.md`) |
 | Themes | Light, and dark if supported |
 | Output | `.design-review/` at the repo root; `.gitignore` always updated (see "Where files go") |
 
 ## Workflow
 
-### Step 0: Intake
-1. Read `.design-review/PROFILE.md` if it exists: audience lens, accepted exceptions, overrides, last score.
-2. Detect the framework, routes, styling system and UI libraries (`frameworks.md`, `styling.md`).
-3. Inventory the intended design system from code: colors, type scale, spacing, radii, shadows, breakpoints, containers, fonts. Read design docs if present (DESIGN.md, a brand guide, a template audit such as `docs/audit/`) and record deliberate choices under "Brand decisions" in PROFILE.md so they aren't "fixed" later.
-4. Set up `.design-review/` and `.gitignore` (see "Where files go") before writing anything else.
-5. Create a task list and `.design-review/runs/<date>/progress.md` so a long run can resume.
+### Step 0: Set up the run
+Create `.design-review/runs/<date>/` (see "Where files go"), choose pages and viewports, then:
+`node <skill>/scripts/ledger.mjs init --run <run> --pages ... --viewports <core> --key-pages ... --key-viewports <fold + extended> [--themes light,dark]`
+Create a task list mirroring the passes.
 
-### Step 1: Audience & industry lens
-Write the audience profile (template in `lenses.md`): industry and business goal, primary and secondary audiences, context of use, each audience's main path. Sources: the user, PROFILE.md, DESIGN.md/CLAUDE.md/README, site copy, analytics the user shares. Pick and combine lenses; they change thresholds, weights and red flags but never lower WCAG minimums. Record the lens in PROFILE.md.
+### Step 1: Passes, in ledger order
+`intake` → `lens` → `capture` → `space-gaps` → `space-edges` → `space-columns` → `first-screen` → `fill-width` → `responsive` → `hierarchy` → `typography` → `color` → `imagery` → `states` → `details` → `copy` → `code` → `score` → `report`.
+Follow the loop above. The order matters: space passes come early because empty space, cramped edges and a hidden first screen are what users notice first, and later passes (hierarchy, imagery) build on a layout that has already been judged.
 
-### Step 2: Preflight
-Choose the evidence level and state it: **rendered + code** (best), **code + screenshots**, or **code only** (visual findings Inferred). Get the site running or use the user's URL (`frameworks.md` → Run the site). Never invent secrets or use real users' credentials. Production builds can take minutes: start the build in the background and do the Step 5 code reading while it runs. If serving it needs a local run config (for example a `.claude/launch.json` entry), add it and say so in Assumptions.
-
-### Step 3: Capture at many resolutions
-- **Playwright available** (in the project or globally): run
-  `node <skill>/scripts/capture.mjs --url <base> --pages /,/pricing --viewports core --themes light,dark --breakpoints <project breakpoints> --out .design-review/runs/<date>`
-  then again with `--viewports extended` for key pages. It saves above-the-fold and full-page screenshots plus measurement JSON per page × viewport × theme, and `capture-summary.json`. Use `--dark-class` for class-based dark mode.
-- **No Playwright package, but Chrome or Edge installed:** run `scripts/capture-cdp.mjs` with the same arguments (`--help` lists them). It writes the same files and needs no install.
-- **Otherwise:** use the session's browser tool (load its skill first) at the same viewports, and evaluate `scripts/measure.js` per capture. Browser-tool screenshots aren't saved to disk, so the report cites measurements instead of image paths.
-- **Windows Git Bash:** prefix the command with `MSYS_NO_PATHCONV=1`, or `--pages /` becomes `C:/Program Files/Git/`.
-- In a browser tool, also capture what a batch run can't: hover and keyboard focus, menus, modals, accordions, form states (never submit to real endpoints), loading, error, 404, empty lists, 200% zoom, stress content (long titles, missing images, longest locale), at one phone and one desktop width.
-
-### Step 4: Measure and map to source
-Every color, size and spacing finding quotes a measured value from the measurement JSON. Read it critically:
-- `contrastIssues` lists computed failures (`ratio < need`) first, then two kinds where the ratio is a guess. A failure marked `overBackdrop: true` is on a see-through surface that floats over other content (a fixed, sticky or overlaid bar, a backdrop-filter panel), so its background was composed from the wrong layers. Text over images (`overImage: true`, often 21:1) is listed whatever its ratio. For both, sample the pixels behind the text in the screenshot before calling it a failure or a pass.
-- `cardSets` detects framed boxes (radius, border or shadow) that repeat as siblings. If cards are drawn another way and it comes back empty, measure card widths in a browser tool instead and say so in "Not checked".
-- `smallTargets` repeats on every page for shared header/footer controls; report them once.
-- `fieldBoundaryIssues` lists form fields whose outline (a border, or a ring drawn as a box-shadow) and fill both stay under 3:1 against the surface around them; `placeholderTruncated` lists placeholders wider than their field.
-- Measurements are at rest and from the page's own DOM: hover, open menus and content inside canvas or frames need screenshots.
-
-Map elements to code with `scripts/locate.js` in dev builds, or grep for visible text and class names (`frameworks.md` → Element → source).
-
-### Step 5: Code review
-Check the design-facing code smells in `styling.md` for the project's systems (raw values instead of tokens, variant sprawl, removed focus, image components, fonts, motion guards, fragile grids, missing states).
-
-### Step 6: Judge
-Score the 13 categories in `rubric.md` with the lens weights. Look at the screenshots, not just the numbers: hierarchy, harmony, imagery and audience fit need eyes.
-
-### Step 7: Findings
-Each finding: ID by category, severity (Blocker / High / Medium / Nit, defined in `rubric.md`), Confirmed or Inferred, page @ viewport @ theme, selector and `file:line`, which audience it affects, the rule and its source, an **exact fix in the project's system** ("Change X to Y because Z", with the new measured value), and effort S/M/L. Group repeats into one finding; name what works well.
+Every finding, in every pass: ID by category, severity (Blocker / High / Medium / Nit, `rubric.md`), Confirmed or Inferred, page @ viewport @ theme, selector and `file:line`, which audience it affects, the rule, the **measured value**, the **cause** (which CSS makes it, e.g. `section.py-32 padding-bottom 128px + next section padding-top 128px`), an **exact fix in the project's system**, the **expected result** after the fix (the new measured value), and effort S/M/L. Group repeats across pages and viewports into one finding.
 
 Before writing a fix, check that it fits:
 - **Measure the room it needs.** "Keep it on one line", "make it bigger" or "add padding" must fit the available width or height at every tested viewport; if it only fits in some places, say where and give the alternative for the rest.
-- **Check shared components everywhere they appear.** A header, banner, card or button used on several pages or in several contexts (hero vs footer, desktop vs phone) needs a fix that works in all of them, or a named variant for the one that differs.
-- **Give the expected result, not just the change:** the new measured value or position (for example where the primary action lands at 1366×768), so the fix can be verified.
+- **Check shared components everywhere they appear.** A header, banner, card, section wrapper or spacing token used on several pages needs a fix that works in all of them, or a named variant for the one that differs.
+- **Removing space must not cram.** A gap fix lands on the page's normal rhythm (or the lens minimum), never below it; check the result against the `space-edges` rules.
 
-### Step 8: Report
-Write `.design-review/runs/<date>/report.md`:
+### Step 2: Score and report
+The `score` and `report` passes (their files say how).
 
-```
-# Design review: <site> (<date>)
-Grade: B (82/100) · Projected after Blocker/High fixes: A (91) · Evidence: rendered + code (staging) · Stack: <framework> + <styling>
-Audience: <primary> + <secondary> · Industry: <industry> · Lens: <lens names>
-Pages: 6 · Viewports: 7 core + 8 extended + breakpoint edges · Themes: light/dark
-Blockers 1 · High 4 · Medium 9 · Nits 6 · Accepted exceptions skipped: 2
-.gitignore: `.design-review/runs/` already ignored | added
+### Step 3: Final check before answering (always)
+1. `ledger.mjs verify` → READY. Not ready: retry the listed cells now (re-capture, re-run the snippet, take the missing screenshot). Only then block what truly can't be done.
+2. Re-read the report against this list and fix what fails:
+   - every finding has a measured value, a cause, an exact fix and an expected result;
+   - every Blocker and High was seen in a screenshot (not only in numbers);
+   - every page × viewport in the ledger appears in the resolution matrix;
+   - "Not checked" lists every blocked cell (`ledger.mjs notchecked`) and every pass that had no evidence;
+   - no fix makes another finding worse (a gap fix that creates an edge contact, a sticky column hidden under the header).
+3. If anything failed, go back to that pass, then verify again.
 
-## Assumptions
-## Audience profile
-## Top 5 changes (highest impact first)
-## Scores by category (weights used, vs last review)
-## Findings
-| ID | Sev | Category | Audience | Where (page @ viewport, file:line) | Evidence | Rule | Fix | Effort |
-## Resolution matrix (page × viewport: pass / issue IDs)
-## What works well
-## Not checked (and why)
-## Before/after (fix mode)
-```
+In chat: grade (with the projection), the audience in one line, top 5 changes, the report path, whether `.gitignore` was updated, what wasn't checked, and an offer of fix mode.
 
-A low grade can come from the rubric's scale (2/4 "acceptable" earns 50% of a category), so when most categories are 2–3 say in one line under the grade what drives it and what the projected grade is.
-
-In chat: grade (with the projection), the audience in one line, top 5 changes, the report path, whether `.gitignore` was updated, and an offer of fix mode.
-
-### Step 9: Improve this skill
-After the report, look back at the run: where the scripts or references failed, misled or were missing (a tool not installed, a false positive, a mangled argument, a rule the lens didn't cover, a calibration that felt wrong). Propose changes to this skill's files as a unified diff in chat, one short reason per change, and **wait for the user's approval before applying**. Never edit the skill folder without approval, and never put project details (names, URLs, findings) into the skill.
+### Step 4: Improve this skill
+After the report, look back at the run: where the scripts or references failed, misled or were missing (a tool not installed, a false positive, a mangled argument, a rule the lens didn't cover, a calibration that felt wrong). Propose changes to this skill's files as a unified diff in chat, one short reason per change, and **wait for the user's approval before applying**. Never edit the skill folder without approval, and never put project details (names, URLs, findings) into the skill: write the general rule that would have caught it. After changing a script, run `node <skill>/tests/selftest.mjs` (every planted defect still found, the well-spaced controls still clean); when a real site showed a new pattern, add it to the fixture and a check to the self-test first.
 
 ## Fix mode
 
 When the user says fix, apply or polish (all, by severity, or by IDs):
 1. Blockers → High → Medium; Nits only if asked.
-2. One finding per change, smallest change, in the project's framework and tokens (`styling.md`). One commit per finding if the user wants commits; never push.
+2. One finding per change, smallest change, in the project's framework and tokens (`styling.md`). Space fixes go to the spacing owner (the section wrapper, the token, the parent `gap`), not to one-off margins. One commit per finding if the user wants commits; never push.
 3. **Ask first** before changing brand colors, fonts or logo; rewriting the meaning of copy; removing images, sections or content; restructuring navigation or layouts across many pages; adding dependencies or a UI library.
-4. Re-capture the same pages, viewports and themes into `runs/<date>/after/`, re-measure, re-score, note regressions.
+4. Re-capture the same pages, viewports and themes into `runs/<date>/after/`, re-measure, re-score, note regressions (re-run the space passes especially: removing space in one place often creates an edge contact or a cramped group elsewhere).
 5. Run the project's lint, typecheck and tests if present. When each finding gets its own branch, run the tests on each branch alone, not only on all of them combined: a markup change can trip a guard test that counts elements or compares a snapshot (an animation inventory, a DOM or visual baseline), and that branch must carry the updated baseline itself.
 
 ## Scoped modes
-- **"Review my changes" / PR:** `git diff` against the base branch → affected components/templates → the routes using them, plus global effects of token or theme changes.
+- **"Review my changes" / PR:** `git diff` against the base branch → affected components/templates → the routes using them, plus global effects of token or theme changes. Init the ledger with just those pages.
 - **One page or component:** same rules; check the component everywhere it's used.
+- **Only one concern** ("just the spacing", "only hover states"): init the ledger as usual, then mark the other passes `blocked --permanent --reason "out of scope (user asked for X only)"`; the report says so.
 - **Storybook / Histoire / Ladle:** also review components in isolation (all variants and states).
 - **Design comp provided:** differences are findings unless the build is better; say why.
 
@@ -137,8 +116,14 @@ The skill lives in a skills folder (`~/.claude/skills/` for personal use, or a r
 
 ```
 .design-review/
-  PROFILE.md     # committed: audience lens, brand decisions, overrides, accepted exceptions, score history (never secrets)
-  runs/          # NOT committed: reports, screenshots, measurements
+  PROFILE.md       # committed: audience lens, lens thresholds, brand decisions, overrides, accepted exceptions, score history (never secrets)
+  runs/<date>/     # NOT committed
+    ledger.json    # the pass ledger
+    lens.json      # space thresholds used (capture --opts lens.json, or __SDR_BATCH.opts)
+    measure/       # one JSON per page x viewport x theme
+    screenshots/
+    findings/      # one file per pass
+    report.md
 ```
 
 **`.gitignore` (required, every run)**, at the git repository root (`git rev-parse --show-toplevel`; in a monorepo, the repo root):
@@ -152,13 +137,16 @@ The skill lives in a skills folder (`~/.claude/skills/` for personal use, or a r
 3. If files under `runs/` are already tracked, tell the user and give `git rm -r --cached .design-review/runs`; don't run it unless asked.
 4. Say in the report and in chat whether the line was already there or added.
 
-This is the only tracked file outside `.design-review/` that review mode changes; "report only" or "don't change code" still allows it, so say you added it. Not a git repo: skip this step and say so. User doesn't want any files in the project ("don't touch the repo"): write to `~/.design-review/<project-name>/`, skip `.gitignore`, and say where.
+This is the only tracked file outside `.design-review/` that review mode changes; "report only" or "don't change code" still allows it, so say you added it. Not a git repo: skip this step and say so. The user doesn't want any files in the project ("don't touch the repo"), or the source isn't available to you: write to `~/.design-review/<project-name>/` (or the session's working folder), skip `.gitignore`, and say where.
 
 ## Common mistakes
-- Judging without an audience profile, or applying one audience's taste to another.
-- Opinions without a measured value or an exact fix.
+- Looking at everything at once instead of one pass at a time; reporting before `ledger verify` is READY.
+- Judging without an audience profile, or applying one audience's taste to another. "Generous for seniors" means bigger text, targets and spacing *inside* groups, not empty bands between them.
+- Measuring before `settle`: scroll-reveal content still at opacity 0 looks like empty space.
+- Browser-tool runs: navigating the measuring tab (it wipes the results), or reporting phone first-screen numbers from iframes without confirming them in mobile emulation.
+- Opinions without a measured value, a cause and an exact fix.
 - Fixes in Tailwind or React for a project that uses something else.
-- Reviewing only one or two resolutions.
+- Reviewing only one or two resolutions, or only tall ones: short laptops (1366×650 after browser bars) are where heroes overflow.
 - Burying Blockers under Nits; "fixing" deliberate brand choices into generic defaults.
 - Calling code-only judgments Confirmed.
 - Reporting `overImage` or `overBackdrop` contrast flags as failures, or trusting an empty `cardSets` as "no cards".

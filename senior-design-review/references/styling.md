@@ -1,6 +1,6 @@
 # Styling systems: code review and writing fixes
 
-Read at Step 5 (code review) and whenever writing a fix. Use only the rows for the systems the project uses.
+Read in the `code` pass and whenever writing a fix. Use only the rows for the systems the project uses.
 
 ## Contents
 - Rules for every system
@@ -45,8 +45,22 @@ Read at Step 5 (code review) and whenever writing a fix. Use only the rows for t
 - **Motion:** animations without a `prefers-reduced-motion` guard; an entrance animation on every card.
 - **Fragile layout:** fixed px heights on text containers; truncation hiding important content; grids with no responsive variants (Tailwind `grid-cols-3` with no breakpoint prefix, Bootstrap `col-4` with no `col-md-*`, MUI Grid with only `xs`, CSS grids with fixed column counts).
 - **Missing states:** no hover/focus/disabled styles; lists without empty states; data views without loading or error UI.
+- **Doubled section spacing:** every section pads top *and* bottom (`py-32`, `padding: 8rem 0`) so neighbors add up to twice the rhythm; wrappers adding margins on top. One owner: sections pad one side, or the parent uses `gap`.
+- **Space that scales with the screen:** `vh` paddings, `min-height: 100vh` heroes, `h-screen` with `overflow: hidden` (clips content on short laptops).
+- **Margin collapse through bands:** a child's `margin-top`/`margin-bottom` inside a colored section with no padding, border or `display: flow-root` lands outside the band and the child touches the band edge.
+- **Height locks:** `min-height`/`height` on cards and text boxes; grids stretching every card to the tallest.
+- **Centering against tall neighbors:** `items-center` / `align-items: center` on a row whose other column is taller than the screen (use sticky or `items-start`).
+- **Hover not guarded for touch:** `:hover` rules outside `@media (hover: hover)` (Tailwind v3 `hover:` utilities aren't guarded; v4's are); hover that changes border width, padding or font weight; `transition: all`.
 
 ## The same fix in different systems
+
+| System | Doubled section gap | Short column beside a tall one |
+|---|---|---|
+| Tailwind | `py-32` on each section → `pt-24` on each, `pb-24` on the last (or `space-y-*` / `gap-*` on the parent) | `lg:items-start` on the row; `lg:sticky lg:top-28 self-start` on the short column |
+| Bootstrap | `py-5` on each → `pt-5` + `pb-5` only on the last; `$spacer` multiples | `align-items-start`; `position-sticky` with `style="top: …"` |
+| MUI | `sx={{ py: 16 }}` → `sx={{ pt: 12 }}`; or a `Stack spacing` parent | `alignItems="flex-start"`; `sx={{ position: { lg: 'sticky' }, top: 112 }}` |
+| Vanilla CSS / Sass | `section + section { padding-top: 0 }` or one `--section-gap` used as parent `gap` | `.row { align-items: start } .intro { position: sticky; top: calc(var(--header-h) + 24px) }` |
+| WordPress block theme | `blockGap` / spacing presets in `theme.json` instead of per-block padding | Columns block `verticalAlignment: top`; sticky via a custom class |
 
 | System | Muted text too light | Cards too narrow at desktop |
 |---|---|---|

@@ -5,11 +5,12 @@
 // Usage:
 //   node capture.mjs --url http://localhost:3000 --pages /,/pricing --out .design-review/runs/2026-01-31
 //   Options:
-//     --viewports core | extended | all | 390x844,1440x900   (default: core)
+//     --viewports core | extended | fold | all | 390x844,1440x900   (default: core)
 //     --themes light,dark                                    (default: light)
 //     --dark-class dark        also add this class to <html> for dark (class-based themes)
 //     --breakpoints 640,768    add each breakpoint -1px and +1px at 900px height
 //     --wait 800               extra ms to wait after load (animations)
+//     --opts lens.json         space thresholds from the lens (JSON object or file; see references/passes/space-gaps.md)
 //
 // Playwright is resolved from the project first (cwd), then from this script's location / global.
 // Run with --help for this text. Exit code 1 if nothing could be captured.
@@ -26,7 +27,7 @@ const args = Object.fromEntries(process.argv.slice(2).reduce((acc, a, i, arr) =>
 }, []));
 
 if (args.help || !args.url) {
-  console.log(readFileSync(fileURLToPath(import.meta.url), 'utf8').split('\n').slice(1, 17).map(l => l.replace(/^\/\/ ?/, '')).join('\n'));
+  console.log(readFileSync(fileURLToPath(import.meta.url), 'utf8').split('\n').slice(1).filter((l, i, a) => a.slice(0, i + 1).every(x => x.startsWith('//'))).map(l => l.replace(/^\/\/ ?/, '')).join('\n'));
   process.exit(args.help ? 0 : 1);
 }
 
@@ -42,6 +43,8 @@ function loadPlaywright() {
 
 const VIEWPORTS = {
   core: ['360x800', '390x844', '768x1024', '1024x768', '1280x800', '1440x900', '1920x1080'],
+  // short screens: laptop height after browser bars and 125% zoom, phones with browser bars
+  fold: ['1280x620', '1366x650', '1440x700', '1536x730', '390x664', '360x640'],
   extended: ['320x568', '430x932', '844x390', '820x1180', '1366x768', '1536x864', '2560x1440', '3440x1440'],
 };
 
@@ -52,7 +55,7 @@ if (!pw) {
 }
 
 const vpArg = String(args.viewports || 'core');
-let viewports = vpArg === 'all' ? [...VIEWPORTS.core, ...VIEWPORTS.extended]
+let viewports = vpArg === 'all' ? [...VIEWPORTS.core, ...VIEWPORTS.extended, ...VIEWPORTS.fold]
   : VIEWPORTS[vpArg] ? [...VIEWPORTS[vpArg]] : vpArg.split(',');
 if (args.breakpoints) for (const b of String(args.breakpoints).split(',').map(Number)) viewports.push(`${b - 1}x900`, `${b + 1}x900`);
 viewports = [...new Set(viewports)].map(v => { const [w, h] = v.split('x').map(Number); return { w, h }; }).filter(v => v.w && v.h);
@@ -61,6 +64,10 @@ const pages = String(args.pages || '/').split(',');
 const themes = String(args.themes || 'light').split(',');
 const out = resolve(String(args.out || `.design-review/runs/${new Date().toISOString().slice(0, 10)}`));
 const measureSrc = readFileSync(join(here, 'measure.js'), 'utf8');
+const spaceSrc = readFileSync(join(here, 'space.js'), 'utf8');
+const settleSrc = readFileSync(join(here, 'settle.js'), 'utf8');
+const optsArg = args.opts ? String(args.opts) : '';
+const spaceOpts = !optsArg ? {} : optsArg.trim().startsWith('{') ? JSON.parse(optsArg) : JSON.parse(readFileSync(optsArg, 'utf8'));
 const extraWait = Number(args.wait || 800);
 const slug = p => (p.replace(/^\/|\/$/g, '').replace(/[^a-z0-9]+/gi, '-') || 'home').toLowerCase();
 
@@ -78,20 +85,24 @@ for (const theme of themes) {
         entry.status = res?.status();
         if (theme === 'dark' && args['dark-class']) await page.evaluate(c => document.documentElement.classList.add(c), String(args['dark-class']));
         await page.evaluate(() => document.fonts?.ready);
-        await page.evaluate(async () => { for (let y = 0; y < document.body.scrollHeight; y += innerHeight / 2) { scrollTo(0, y); await new Promise(r => setTimeout(r, 120)); } scrollTo(0, 0); });
         await page.waitForTimeout(extraWait);
+        // final visible state: reveal-on-scroll and entrance animations jumped to their end (see settle.js)
+        const settled = await page.evaluate(settleSrc);
         mkdirSync(dir, { recursive: true });
         await page.screenshot({ path: join(dir, `${name}-fold.png`) });
         await page.screenshot({ path: join(dir, `${name}-full.png`), fullPage: true });
         const m = await page.evaluate(measureSrc);
+        await page.evaluate(o => { window.__SDR_OPTS = o; }, spaceOpts);
+        m.space = await page.evaluate(spaceSrc);
+        m.settle = settled;
         mkdirSync(join(out, 'measure'), { recursive: true });
         writeFileSync(join(out, 'measure', `${slug(p)}-${name}.json`), JSON.stringify(m, null, 2));
-        Object.assign(entry, { ok: true, overflow: m.horizontalOverflow, contrastIssues: m.contrastIssues.length, smallTargets: m.smallTargets.length, cardSets: m.cardSets.length, longLines: m.lineLengthIssues.length, fieldBoundaries: m.fieldBoundaryIssues.length, truncatedPlaceholders: m.placeholderTruncated.length });
+        Object.assign(entry, { ok: true, overflow: m.horizontalOverflow, contrastIssues: m.contrastIssues.length, smallTargets: m.smallTargets.length, cardSets: m.cardSets.length, longLines: m.lineLengthIssues.length, fieldBoundaries: m.fieldBoundaryIssues.length, truncatedPlaceholders: m.placeholderTruncated.length, spaceGaps: m.space.oversizedGaps.length, edges: m.space.edgeIssues.length, firstScreenFits: m.space.firstScreen?.fits ?? null });
       } catch (e) {
         Object.assign(entry, { ok: false, error: String(e.message || e).split('\n')[0] });
       }
       summary.push(entry);
-      console.log(entry.ok ? `ok   ${p} @ ${entry.viewport} ${theme}  contrast:${entry.contrastIssues} targets:${entry.smallTargets} fields:${entry.fieldBoundaries} overflow:${entry.overflow}` : `FAIL ${p} @ ${entry.viewport} ${theme}  ${entry.error}`);
+      console.log(entry.ok ? `ok   ${p} @ ${entry.viewport} ${theme}  contrast:${entry.contrastIssues} targets:${entry.smallTargets} fields:${entry.fieldBoundaries} overflow:${entry.overflow} gaps:${entry.spaceGaps} edges:${entry.edges} fold:${entry.firstScreenFits}` : `FAIL ${p} @ ${entry.viewport} ${theme}  ${entry.error}`);
     }
     await ctx.close();
   }

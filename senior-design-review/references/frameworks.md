@@ -1,6 +1,6 @@
 # Frameworks, running the site, and viewports
 
-Read at Steps 0, 2 and 3. Only the parts for the detected stack matter. This file records what the review needs; it is not a framework tutorial. For anything not listed, apply the general rule: read the project's config and README, follow its conventions, and say what you assumed.
+Read in the `intake` and `capture` passes. Only the parts for the detected stack matter. This file records what the review needs; it is not a framework tutorial. For anything not listed, apply the general rule: read the project's config and README, follow its conventions, and say what you assumed.
 
 ## Contents
 - Detect the stack
@@ -47,11 +47,12 @@ Read README, `package.json` scripts, `Makefile`, `Procfile`, `docker-compose.yml
 
 ## Viewports and breakpoints
 
-CSS px, width × height. `scripts/capture.mjs` has these built in (`--viewports core|extended|all`).
+CSS px, width × height. `scripts/capture.mjs` and `capture-cdp.mjs` have these built in (`--viewports core|fold|extended|all`); browser-tool runs pass them to `__SDR_BATCH.viewports`.
 
 | Tier | Viewports | Use on |
 |---|---|---|
 | Core | 360×800, 390×844, 768×1024, 1024×768, 1280×800, 1440×900, 1920×1080 | Every page in scope |
+| Short screens (`fold`) | 1280×620, 1366×650, 1440×700, 1536×730 (laptops after browser bars and 125% Windows scaling), 390×664, 360×640 (phones with browser bars) | Key pages, and every landing or tool page: this is where heroes overflow and main actions drop below the fold |
 | Extended | 320×568, 430×932, 844×390 (phone landscape), 820×1180, 1366×768 (short laptop fold), 1536×864, 2560×1440, 3440×1440 (ultrawide) | Home, main landing page, main app screen, plus what the lens points to |
 | Breakpoint edges | each project breakpoint −1px and +1px (`--breakpoints`) | Key pages |
 | Zoom & density | browser zoom 200% (and 400% at 1280 = 320px reflow); device pixel ratio 1 and 2 | Home + one content page (browser tool) |

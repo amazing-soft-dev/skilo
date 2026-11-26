@@ -1,11 +1,12 @@
 # Audience & industry lenses
 
-Read at Step 1. Pick one or more audience lenses and one industry lens, combine them (e.g. insurance × seniors), and record the result in PROFILE.md. A lens changes thresholds, weights and red flags; it never lowers WCAG minimums. These are starting points: adjust to the brief and to what the user says.
+Read in the `lens` pass. Pick one or more audience lenses and one industry lens, combine them (e.g. insurance × seniors), and record the result in PROFILE.md. A lens changes thresholds, weights and red flags; it never lowers WCAG minimums. These are starting points: adjust to the brief and to what the user says.
 
 ## Contents
 - Audience profile template
 - Audience lenses (who)
 - Industry lenses (what)
+- Space thresholds per lens (lens.json)
 - Weight shifts
 
 ## Audience profile template
@@ -50,12 +51,28 @@ Source: user | PROFILE.md | DESIGN.md/README | site copy (inferred)
 | News / media / blog | Reading typography, ad placement not breaking reading, article and index layouts |
 | Portfolio / creative / agency | Work shown large; distinct identity; novelty acceptable if navigation stays clear |
 
+## Space thresholds per lens (lens.json)
+
+`space.js` reads these (capture `--opts lens.json`, or `__SDR_BATCH.opts`). Start from the defaults and apply each chosen lens's row. When lenses disagree, take the value that is kinder to reading (larger `edgeMin`, `paraMinEm`) and the one that is stricter about dead space (smaller `bandShare`).
+
+| Lens | gapMultiplier | gapFloor | bandShare | edgeMin / phone | paraMinEm | fillMin | Why |
+|---|---|---|---|---|---|---|---|
+| Defaults | 1.5 | 96 | 0.25 | 16 / 12 | 0.5 | 0.55 | |
+| Older adults / low vision / healthcare / government | 1.5 | 120 | 0.25 | 24 / 16 | 0.75 | 0.55 | Roomier inside groups and around edges; empty bands stay strict: at 200% zoom and on short laptops they read as the end of the page and cost extra scrolling |
+| Engineers / B2B / dashboards / e-commerce listings | 1.5 | 80 | 0.2 | 12 / 12 | 0.5 | 0.6 | Dense and scannable; dead space costs comparisons |
+| Luxury / portfolio / editorial / creative | 2 | 160 | 0.35 | 24 / 16 | 0.6 | 0.45 | Breathing room is part of the brand; still no empty band at the bottom of the first screen |
+| Children / teens, gaming, general consumers | 1.5 | 96 | 0.25 | 16 / 12 | 0.5 | 0.55 | Defaults |
+
+Other options keep their defaults unless the brief says otherwise: `bandHard` 0.4, `orphanGap` 96, `columnDiffPx` 160, `columnDiff` 0.3, `farShare` 0.3, `wideShare` 0.5.
+
+"More space" for an audience means larger type, line height, targets and padding inside components. It never means empty bands between sections.
+
 ## Weight shifts
 
 Default weights are in `rubric.md`. A lens may move any category by up to ±4 points (total stays 100). Typical shifts:
-- Seniors, healthcare, government: Accessibility +4, Typography +2, Motion −1, Audience fit +1 (take from Consistency/Spacing).
-- Gaming, portfolio/creative: Content & imagery +3, Motion +3 (take from Copy and Consistency).
-- Engineers / dev tools, B2B: Copy +2, Hierarchy +2 (take from Content & imagery and Motion).
-- Staffing, e-commerce, consumer: Responsive +3, Hierarchy & CTA +2 (take from Motion and Consistency).
+- Seniors, healthcare, government: Accessibility +4, Typography +2, Space use +1, Motion −1, Audience fit +1 (take from Consistency, Spacing & text rhythm, Content type, Component sizing).
+- Gaming, portfolio/creative: Content & imagery +3, Motion +3 (take from Copy, Consistency and Space use).
+- Engineers / dev tools, B2B: Copy +2, Hierarchy +2, Space use +1 (take from Content & imagery, Motion and Interaction & detail craft).
+- Staffing, e-commerce, consumer: Responsive +3, Hierarchy & main action +2 (take from Motion, Consistency and Copy).
 
 Lens-driven extra viewports are listed in `frameworks.md` → Viewports.

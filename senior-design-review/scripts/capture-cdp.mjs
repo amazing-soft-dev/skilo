@@ -6,13 +6,15 @@
 // Usage:
 //   node capture-cdp.mjs --url http://localhost:3000 --pages /,/pricing --out .design-review/runs/2026-01-31
 //   Options:
-//     --viewports core | extended | all | 390x844,1440x900   (default: core)
+//     --viewports core | extended | fold | all | 390x844,1440x900   (default: core)
 //     --themes light,dark                                    (default: light)
 //     --dark-class dark        also add this class to <html> for dark (class-based themes)
 //     --breakpoints 640,768    add each breakpoint -1px and +1px at 900px height
 //     --measure path           measurement script to evaluate (default: measure.js beside this script)
 //     --wait 900               extra ms to wait after load (animations)
 //     --full false             skip the full-page screenshots
+//     --chrome path            browser executable (default: Chrome/Edge in the usual Windows, macOS or Linux location, or CHROME_PATH)
+//     --opts lens.json         space thresholds from the lens (JSON object or file; see references/passes/space-gaps.md)
 //
 // Run with --help for this text. Exits with code 1 when --url or --out is missing.
 
@@ -31,7 +33,7 @@ const args = Object.fromEntries(process.argv.slice(2).reduce((acc, a, i, arr) =>
 // Checked before anything is read or launched, so a missing argument prints the usage instead of a stack trace.
 const text = k => typeof args[k] === 'string';
 if (args.help || !text('url') || !text('out')) {
-  console.log(readFileSync(fileURLToPath(import.meta.url), 'utf8').split('\n').slice(1, 17).map(l => l.replace(/^\/\/ ?/, '')).join('\n'));
+  console.log(readFileSync(fileURLToPath(import.meta.url), 'utf8').split('\n').slice(1).filter((l, i, a) => a.slice(0, i + 1).every(x => x.startsWith('//'))).map(l => l.replace(/^\/\/ ?/, '')).join('\n'));
   process.exit(args.help ? 0 : 1);
 }
 const measureFile = text('measure') ? resolve(args.measure) : join(here, 'measure.js');
@@ -42,21 +44,35 @@ if (!existsSync(measureFile)) {
 
 const VIEWPORTS = {
   core: ['360x800', '390x844', '768x1024', '1024x768', '1280x800', '1440x900', '1920x1080'],
+  // short screens: laptop height after browser bars and 125% zoom, phones with browser bars
+  fold: ['1280x620', '1366x650', '1440x700', '1536x730', '390x664', '360x640'],
   extended: ['320x568', '430x932', '844x390', '820x1180', '1366x768', '1536x864', '2560x1440', '3440x1440'],
 };
 const vpArg = String(args.viewports || 'core');
-let viewports = vpArg === 'all' ? [...VIEWPORTS.core, ...VIEWPORTS.extended] : VIEWPORTS[vpArg] ? [...VIEWPORTS[vpArg]] : vpArg.split(',');
+let viewports = vpArg === 'all' ? [...VIEWPORTS.core, ...VIEWPORTS.extended, ...VIEWPORTS.fold] : VIEWPORTS[vpArg] ? [...VIEWPORTS[vpArg]] : vpArg.split(',');
 if (args.breakpoints) for (const b of String(args.breakpoints).split(',').map(Number)) viewports.push(`${b - 1}x900`, `${b + 1}x900`);
 viewports = [...new Set(viewports)].map(v => { const [w, h] = v.split('x').map(Number); return { w, h }; });
 const pages = String(args.pages || '/').split(',');
 const themes = String(args.themes || 'light').split(',');
 const out = resolve(String(args.out));
 const measureSrc = readFileSync(measureFile, 'utf8');
+const spaceSrc = readFileSync(join(here, 'space.js'), 'utf8');
+const settleSrc = readFileSync(join(here, 'settle.js'), 'utf8');
+const optsArg = text('opts') ? String(args.opts) : '';
+const spaceOpts = !optsArg ? {} : optsArg.trim().startsWith('{') ? JSON.parse(optsArg) : JSON.parse(readFileSync(optsArg, 'utf8'));
 const full = args.full !== 'false';
 const slug = p => (p.replace(/^\/|\/$/g, '').replace(/[^a-z0-9]+/gi, '-') || 'home').toLowerCase();
 
-const chromePaths = ['C:/Program Files/Google/Chrome/Application/chrome.exe', 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'];
-const chrome = chromePaths.find(existsSync);
+const chromePaths = [text('chrome') && String(args.chrome), process.env.CHROME_PATH,
+  'C:/Program Files/Google/Chrome/Application/chrome.exe', 'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe',
+  'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe', 'C:/Program Files/Microsoft/Edge/Application/msedge.exe',
+  '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
+  '/usr/bin/google-chrome', '/usr/bin/google-chrome-stable', '/usr/bin/chromium', '/usr/bin/chromium-browser', '/usr/bin/microsoft-edge'].filter(Boolean);
+const chrome = chromePaths.find(p => existsSync(p));
+if (!chrome) {
+  console.error('No Chrome or Edge found. Pass --chrome <path> or set CHROME_PATH, or use capture.mjs (Playwright) or a browser tool.');
+  process.exit(1);
+}
 const port = 9333 + Math.floor(Math.random() * 500);
 const profile = join(tmpdir(), `sdr-cdp-${port}`);
 const proc = spawn(chrome, ['--headless=new', `--remote-debugging-port=${port}`, `--user-data-dir=${profile}`, '--no-first-run', '--hide-scrollbars', '--force-color-profile=srgb', 'about:blank'], { stdio: 'ignore' });
@@ -88,8 +104,9 @@ for (const { theme, vp } of themes.flatMap(theme => viewports.map(vp => ({ theme
       await loaded; listeners.length = 0;
       if (theme === 'dark' && text('dark-class')) await evaluate(`document.documentElement.classList.add(${JSON.stringify(args['dark-class'])}), 1`);
       await evaluate('document.fonts.ready.then(() => 1)');
-      await evaluate('(async () => { for (let y = 0; y < document.body.scrollHeight; y += innerHeight / 2) { scrollTo(0, y); await new Promise(r => setTimeout(r, 120)); } scrollTo(0, 0); return 1; })()');
       await sleep(Number(args.wait || 900));
+      // final visible state: reveal-on-scroll and entrance animations jumped to their end (see settle.js)
+      const settled = await evaluate(settleSrc);
       mkdirSync(dir, { recursive: true });
       const fold = await send('Page.captureScreenshot', { format: 'png' });
       writeFileSync(join(dir, `${name}-fold.png`), Buffer.from(fold.data, 'base64'));
@@ -101,12 +118,15 @@ for (const { theme, vp } of themes.flatMap(theme => viewports.map(vp => ({ theme
       }
       await evaluate('scrollTo(0,0)'); await sleep(200);
       const m = await evaluate(measureSrc);
+      await evaluate(`window.__SDR_OPTS = ${JSON.stringify(spaceOpts)}, 1`);
+      m.space = await evaluate(spaceSrc);
+      m.settle = settled;
       mkdirSync(join(out, 'measure'), { recursive: true });
       writeFileSync(join(out, 'measure', `${slug(p)}-${name}.json`), JSON.stringify(m, null, 2));
-      Object.assign(entry, { ok: true, overflow: m.horizontalOverflow, contrastIssues: m.contrastIssues.length, smallTargets: m.smallTargets.length, cardSets: m.cardSets.length, longLines: m.lineLengthIssues.length, fieldBoundaries: m.fieldBoundaryIssues.length, truncatedPlaceholders: m.placeholderTruncated.length });
+      Object.assign(entry, { ok: true, overflow: m.horizontalOverflow, contrastIssues: m.contrastIssues.length, smallTargets: m.smallTargets.length, cardSets: m.cardSets.length, longLines: m.lineLengthIssues.length, fieldBoundaries: m.fieldBoundaryIssues.length, truncatedPlaceholders: m.placeholderTruncated.length, spaceGaps: m.space.oversizedGaps.length, edges: m.space.edgeIssues.length, firstScreenFits: m.space.firstScreen?.fits ?? null });
     } catch (e) { Object.assign(entry, { ok: false, error: String(e.message || e).split('\n')[0] }); }
     summary.push(entry);
-    console.log(entry.ok ? `ok   ${p} @ ${entry.viewport} ${theme}  contrast:${entry.contrastIssues} targets:${entry.smallTargets} fields:${entry.fieldBoundaries} overflow:${entry.overflow}` : `FAIL ${p} @ ${entry.viewport} ${theme}  ${entry.error}`);
+    console.log(entry.ok ? `ok   ${p} @ ${entry.viewport} ${theme}  contrast:${entry.contrastIssues} targets:${entry.smallTargets} fields:${entry.fieldBoundaries} overflow:${entry.overflow} gaps:${entry.spaceGaps} edges:${entry.edges} fold:${entry.firstScreenFits}` : `FAIL ${p} @ ${entry.viewport} ${theme}  ${entry.error}`);
   }
 }
 mkdirSync(out, { recursive: true });
