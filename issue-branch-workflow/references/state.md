@@ -32,8 +32,8 @@ The state file is `<IBW_DIR>/state.json`. `IBW_DIR` is inside `.git`, so the fil
 
 1. Look at three sources:
    - the state file, if it exists
-   - issues from earlier runs: `gh issue list --label issue-branch-workflow --state open`
-   - remote branches: `git ls-remote --heads origin 'feature/*'`
+   - issues from earlier runs: `gh api 'repos/{owner}/{repo}/issues?labels=issue-branch-workflow&state=open&per_page=100' --jq '.[] | select(.pull_request == null) | "#\(.number) \(.title)"'`
+   - remote branches: `<SKILL>/scripts/git-token.sh ls-remote --heads origin 'feature/*'`
 2. If any of them show an unfinished run, tell the user what is done and what is left. Ask: **Resume** / **Start a new run**.
 3. **Resume:** continue from the first step that is not done. If the sources disagree, trust GitHub and the remote branches over the state file, and correct the file.
    - A commit subject in the state file that is not on the remote branch means that commit still needs pushing.

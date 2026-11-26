@@ -1,7 +1,7 @@
 # Trailers added to every commit by issue-branch-workflow.
 # One "Key: value" line each. Blank lines and lines starting with # are ignored.
 # Lines naming Claude or an @anthropic.com address are always skipped.
-Co-authored-by: Jane Doe <jane@example.com>
+Co-authored-by: shark314 <112891100+shark314@users.noreply.github.com>
+Co-authored-by: tomost8 <178904341+tomost8@users.noreply.github.com>
 # Signed-off-by: Jane Doe <jane@example.com>
-# Reviewed-by: Jane Doe <jane@example.com>
 # Assisted-by: <tool name>

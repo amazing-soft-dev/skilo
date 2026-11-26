@@ -34,16 +34,9 @@ Each task line must match its planned commit subject word for word, so `tick.sh`
 
 ## "Done" comment (step 7)
 
-First make sure it has not been posted yet:
-
-```
-gh issue view <n> --json comments --jq '.comments[].body' | grep -q 'ibw:done'
-```
-
-If nothing matches, post it with `gh issue comment <n> --body-file <file>`:
+Write this to a file and pass it to `scripts/done-comment.sh <n> <file>`. The script adds the `<!-- ibw:done -->` marker, and skips posting if a comment with that marker is already there.
 
 ```markdown
-<!-- ibw:done -->
 All planned commits are pushed to `<branch>`.
 
 Commits:
