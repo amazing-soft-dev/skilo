@@ -1,0 +1,40 @@
+name: Release
+
+# Reads Conventional Commits on main, keeps a release PR open with the next version
+# and CHANGELOG, and tags + publishes a GitHub Release when that PR merges.
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+      prs_created: ${{ steps.release.outputs.prs_created }}
+    steps:
+      - id: release
+        uses: googleapis/release-please-action@v5
+        with:
+          token: ${{ secrets.GH_TOKEN }}   # GITHUB_TOKEN would not start CI on the release PR
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+  # Optional: publish the package when a release is created (see ci-stack-recipes).
+  # publish:
+  #   needs: release-please
+  #   if: needs.release-please.outputs.release_created == 'true'
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v7
+  #       with:
+  #         ref: ${{ needs.release-please.outputs.tag_name }}
+  #     # STACK: publish steps
